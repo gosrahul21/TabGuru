@@ -107,15 +107,18 @@ export default function NewTab() {
       {/* Main card */}
       <div className="relative z-10 w-full max-w-xl mx-4">
         {/* Logo & Headline */}
-        <div className="text-center mb-8 select-none">
-          <div className="text-5xl mb-3 drop-shadow-[0_0_32px_rgba(139,92,246,0.6)] animate-float">
-            🧙
+        <div className="mb-8 select-none flex flex-col items-center">
+          <div className="flex flex-row items-center gap-4">
+            <div className="drop-shadow-[0_0_32px_rgba(139,92,246,0.4)] animate-float">
+              <img src="/icons/icon128.png" alt="TabGuru" className="w-14 h-14 rounded-2xl shadow-xl" />
+            </div>
+            <h1 className="text-5xl font-extrabold tracking-tight">
+              <span className="text-slate-100">Tab</span>
+              <span className="bg-gradient-to-r from-violet-400 to-blue-500 bg-clip-text text-transparent">Guru</span>
+            </h1>
           </div>
-          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
-            TabGuru
-          </h1>
-          <p className="mt-1 text-slate-400 text-sm font-inter font-medium tracking-widest uppercase">
-            Browse with intention
+          <p className="mt-3 text-slate-400 text-sm font-inter font-medium tracking-wide">
+            Every tab starts with a purpose.
           </p>
         </div>
 
@@ -216,7 +219,7 @@ export default function NewTab() {
 
         {/* Footer */}
         <p className="text-center mt-5 text-slate-700 text-xs font-inter">
-          🧙 TabGuru — Purpose-First Browsing
+          TabGuru — Every tab starts with a purpose.
         </p>
       </div>
     </div>
