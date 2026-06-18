@@ -33,6 +33,7 @@ export type MessageType =
   | 'GET_PURPOSE'
   | 'MARK_COMPLETE'
   | 'EXTEND_TIMER'
+  | 'TOGGLE_PAUSE'
   | 'PURPOSE_SAVED'
   | 'OPEN_TAB_WITH_PURPOSE'  // Link interception: open new tab with a pre-set purpose
   | 'BROADCAST_REFRESH'

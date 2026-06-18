@@ -51,12 +51,12 @@ function GoalToast({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="
-      absolute inset-0 flex flex-col items-center justify-center
-      rounded-2xl bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/40
-      text-emerald-300 gap-1
+      absolute inset-0 flex flex-col items-center justify-center z-50
+      rounded-2xl bg-[#0f172a]/98 backdrop-blur-md border border-emerald-500/40
+      text-emerald-400 gap-2
     ">
-      <span className="text-2xl">🎉</span>
-      <span className="text-xs font-semibold font-inter">Goal achieved!</span>
+      <span className="text-4xl animate-bounce">🎉</span>
+      <span className="text-sm font-bold font-inter tracking-wide">Goal achieved!</span>
     </div>
   );
 }
@@ -192,6 +192,17 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
     [tabId]
   );
 
+  // Toggle pause
+  const handleTogglePause = useCallback(async () => {
+    if (!tabId) return;
+    const msg: ExtensionMessage = {
+      type: 'TOGGLE_PAUSE',
+      tabId,
+    };
+    const res = await sendMsg(msg);
+    if (res.success && res.data) setPurpose(res.data);
+  }, [tabId]);
+
   // Mark complete
   const handleComplete = useCallback(() => {
     setShowToast(true);
@@ -289,7 +300,13 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
           {/* Timer row */}
           <div className="mt-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-600">{isPaused ? '⏸' : '⏱'}</span>
+              <button
+                onClick={handleTogglePause}
+                className="text-xs p-1 -ml-1 rounded flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/10 transition-colors cursor-pointer"
+                title={isPaused ? "Resume timer" : "Pause timer"}
+              >
+                {isPaused ? '▶️' : '⏸'}
+              </button>
               <span
                 className={`text-sm font-mono font-bold tabular-nums ${
                   isExpired

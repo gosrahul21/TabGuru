@@ -208,6 +208,23 @@ chrome.runtime.onMessage.addListener(
         return true;
       }
 
+      // ── TOGGLE_PAUSE ───────────────────────────────────────────────────────
+      case 'TOGGLE_PAUSE': {
+        getPurpose(tabId)
+          .then(async (purpose) => {
+            if (!purpose) return null;
+            if (purpose.lastActivatedAt === null) {
+              await resumePurpose(tabId);
+            } else {
+              await pausePurpose(tabId);
+            }
+            return getPurpose(tabId);
+          })
+          .then((data) => sendResponse({ success: true, data }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
       // ── OPEN_TAB_WITH_PURPOSE ──────────────────────────────────────────────
       // Called from the link interceptor modal when user confirms opening a link.
       // Stores a pending purpose, then creates the tab.
