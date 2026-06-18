@@ -12,6 +12,7 @@ import LinkModal from './LinkModal';
 import { initLinkInterceptor } from './linkInterceptor';
 import type { ExtensionMessage, ExtensionResponse, TabPurpose } from '../types';
 import bannerStyles from './banner.css?inline';
+import ChildAwarenessBanner from './ChildAwarenessBanner';
 
 // ─── Shadow DOM host ──────────────────────────────────────────────────────────
 
@@ -62,12 +63,62 @@ function getOrCreateShadowHost(): ShadowRoot {
 // Keeps both Banner and LinkModal in the same React root so they can share state.
 
 interface AppShellProps {
-  purpose: TabPurpose | null;
+  initialPurpose: TabPurpose | null;
+  initialChildren: TabPurpose[];
   tabId: number;
 }
 
-function AppShell({ purpose, tabId }: AppShellProps) {
+function AppShell({ initialPurpose, initialChildren, tabId }: AppShellProps) {
+  const [purpose, setPurpose] = useState<TabPurpose | null>(initialPurpose);
+  const [activeChildren, setActiveChildren] = useState<TabPurpose[]>(initialChildren);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  const fetchState = React.useCallback(async () => {
+    try {
+      const response: ExtensionResponse = await chrome.runtime.sendMessage({
+        type: 'GET_PURPOSE',
+        tabId,
+      });
+      if (response.success) {
+        const activePurp =
+          response.data && response.data.status === 'active'
+            ? response.data
+            : null;
+        setPurpose(activePurp);
+        setActiveChildren(response.activeChildren ?? []);
+      }
+    } catch {
+      // Ignore context invalidated
+    }
+  }, [tabId]);
+
+  React.useEffect(() => {
+    // Listen for visibility change (user switching tabs back to this tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchState();
+        setIsDismissed(false); // Reset dismissal on re-entry
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Listen for real-time broadcasts from background
+    const handleMessage = (message: any) => {
+      if (message.type === 'REFRESH_STATE') {
+        fetchState();
+      }
+    };
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      chrome.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, [fetchState]);
+
+  // We show the most recent active child tab
+  const activeChild = activeChildren.length > 0 ? activeChildren[activeChildren.length - 1] : null;
 
   return (
     <>
@@ -76,6 +127,14 @@ function AppShell({ purpose, tabId }: AppShellProps) {
         <div style={{ position: 'fixed', top: '16px', right: '16px' }}>
           <Banner purpose={purpose} tabId={tabId} />
         </div>
+      )}
+
+      {/* Child tab awareness banner */}
+      {activeChild && !isDismissed && (
+        <ChildAwarenessBanner
+          child={activeChild}
+          onDismiss={() => setIsDismissed(true)}
+        />
       )}
 
       {/* Link interception modal — shows when user clicks a new-tab link */}
@@ -121,6 +180,8 @@ async function init() {
       ? (response.data as TabPurpose)
       : null;
 
+  const initialChildren = response?.activeChildren ?? [];
+
   // Get our tab ID
   const tabId =
     purpose?.tabId ??
@@ -133,7 +194,11 @@ async function init() {
   getOrCreateShadowHost();
   reactRoot?.render(
     <React.StrictMode>
-      <AppShell purpose={purpose} tabId={tabId} />
+      <AppShell
+        initialPurpose={purpose}
+        initialChildren={initialChildren}
+        tabId={tabId}
+      />
     </React.StrictMode>
   );
 }

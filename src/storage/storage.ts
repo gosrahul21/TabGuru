@@ -119,7 +119,8 @@ export async function hasPendingPurposeForUrl(url: string): Promise<boolean> {
  */
 export async function consumePendingPurpose(
   tabId: number,
-  url: string
+  url: string,
+  openerTabId?: number
 ): Promise<TabPurpose | null> {
   const result = await chrome.storage.local.get(KEY_PENDING);
   const pending = (result[KEY_PENDING] ?? []) as PendingPurpose[];
@@ -147,10 +148,19 @@ export async function consumePendingPurpose(
     destinationUrl: match.url,
     accumulatedMs: 0,
     lastActivatedAt: now,
+    openerTabId,
   };
 
   await savePurpose(purpose);
   return purpose;
+}
+
+export async function getActiveChildren(parentTabId: number): Promise<TabPurpose[]> {
+  const result = await chrome.storage.local.get(KEY_ACTIVE);
+  const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;
+  return Object.values(all).filter(
+    (p) => p.openerTabId === parentTabId && p.status === 'active'
+  );
 }
 
 // ─── Recent Purposes (Suggestions) ───────────────────────────────────────────

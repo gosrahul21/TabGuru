@@ -16,6 +16,7 @@ export interface TabPurpose {
   accumulatedMs: number;     // Total ms the tab has been ACTIVE so far
   lastActivatedAt: number | null; // Epoch ms when tab was last focused,
                                   // null = currently paused / backgrounded
+  openerTabId?: number;      // Tab ID of the parent tab that opened this tab
 }
 
 // Map of tabId (as string key) → TabPurpose
@@ -33,7 +34,9 @@ export type MessageType =
   | 'MARK_COMPLETE'
   | 'EXTEND_TIMER'
   | 'PURPOSE_SAVED'
-  | 'OPEN_TAB_WITH_PURPOSE';  // Link interception: open new tab with a pre-set purpose
+  | 'OPEN_TAB_WITH_PURPOSE'  // Link interception: open new tab with a pre-set purpose
+  | 'BROADCAST_REFRESH'
+  | 'ACTIVATE_TAB';
 
 export interface ExtensionMessage {
   type: MessageType;
@@ -42,6 +45,7 @@ export interface ExtensionMessage {
     extraMinutes?: number;
     url?: string;            // for OPEN_TAB_WITH_PURPOSE
     durationMinutes?: number;
+    targetTabId?: number;    // for ACTIVATE_TAB
   };
 }
 
@@ -58,5 +62,6 @@ export interface PendingPurpose {
 export interface ExtensionResponse {
   success: boolean;
   data?: TabPurpose | null;
+  activeChildren?: TabPurpose[];
   error?: string;
 }

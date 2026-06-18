@@ -50,6 +50,7 @@ export default function NewTab() {
       // Get the current tab's ID from the background context
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const tabId = tab.id ?? Date.now(); // fallback for dev
+      const openerTabId = tab.openerTabId;
 
       const now = Date.now();
       const newPurpose: TabPurpose = {
@@ -63,6 +64,7 @@ export default function NewTab() {
         // Timer starts counting immediately — tab is active right now
         accumulatedMs: 0,
         lastActivatedAt: now,
+        openerTabId,
       };
 
       await savePurpose(newPurpose);

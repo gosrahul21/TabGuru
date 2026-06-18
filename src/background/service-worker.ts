@@ -8,13 +8,28 @@ import {
   storePendingPurpose,
   consumePendingPurpose,
   hasPendingPurposeForUrl,
+  getActiveChildren,
 } from '../storage/storage';
 import type { ExtensionMessage, ExtensionResponse } from '../types';
 
 // ─── Tab Lifecycle ────────────────────────────────────────────────────────────
 
-chrome.tabs.onRemoved.addListener((tabId) => {
-  removePurpose(tabId);
+async function broadcastMessage(message: any) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, message);
+        } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  await removePurpose(tabId);
+  await broadcastMessage({ type: 'REFRESH_STATE' });
 });
 
 // ─── Right-click "Open in new tab" interception ───────────────────────────────
@@ -110,10 +125,21 @@ chrome.runtime.onMessage.addListener(
 
             // If no active purpose, try to claim a pending one using the tab's URL
             if (!data && sender.tab?.url) {
-              data = await consumePendingPurpose(tabId, sender.tab.url);
+              let openerTabId: number | undefined;
+              if (sender.tab.id) {
+                try {
+                  const t = await chrome.tabs.get(sender.tab.id);
+                  openerTabId = t.openerTabId;
+                } catch { /* ignore */ }
+              }
+              data = await consumePendingPurpose(tabId, sender.tab.url, openerTabId);
+              if (data) {
+                await broadcastMessage({ type: 'REFRESH_STATE' });
+              }
             }
 
-            sendResponse({ success: true, data });
+            const activeChildren = await getActiveChildren(tabId);
+            sendResponse({ success: true, data, activeChildren });
           } catch (err) {
             sendResponse({ success: false, error: String(err) });
           }
@@ -124,6 +150,7 @@ chrome.runtime.onMessage.addListener(
       // ── MARK_COMPLETE ──────────────────────────────────────────────────────
       case 'MARK_COMPLETE': {
         updatePurposeStatus(tabId, 'completed')
+          .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
         return true;
@@ -159,6 +186,35 @@ chrome.runtime.onMessage.addListener(
             chrome.tabs.create({ url, openerTabId: tabId })
           )
           .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── BROADCAST_REFRESH ──────────────────────────────────────────────────
+      case 'BROADCAST_REFRESH': {
+        broadcastMessage({ type: 'REFRESH_STATE' })
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── ACTIVATE_TAB ───────────────────────────────────────────────────────
+      case 'ACTIVATE_TAB': {
+        const targetTabId = message.payload?.targetTabId;
+        if (!targetTabId) {
+          sendResponse({ success: false, error: 'No target tab ID provided' });
+          return false;
+        }
+        chrome.tabs.update(targetTabId, { active: true })
+          .then(() => {
+            // Also focus the window containing the tab
+            chrome.tabs.get(targetTabId).then((tab) => {
+              if (tab.windowId) {
+                chrome.windows.update(tab.windowId, { focused: true });
+              }
+            }).catch(() => {});
+            sendResponse({ success: true });
+          })
           .catch((err) => sendResponse({ success: false, error: String(err) }));
         return true;
       }
