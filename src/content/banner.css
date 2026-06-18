@@ -1,0 +1,26 @@
+/* ─── Tailwind directives for Shadow DOM injection ──────────────────────────
+   Vite will process this as a separate CSS bundle via ?inline import.
+   Only classes used in Banner.tsx will survive Tailwind's purge step.
+   ──────────────────────────────────────────────────────────────────────── */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom banner animations not available in Tailwind core */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-urgent {
+  0%, 100% { color: rgb(251 146 60); }
+  50%       { color: rgb(239 68 68); }
+}
+
+@keyframes confetti-pop {
+  0%   { transform: scale(0) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1.5) rotate(20deg); opacity: 0; }
+}
+
+.banner-enter { animation: slideDown 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.timer-urgent { animation: pulse-urgent 1s ease-in-out infinite; }

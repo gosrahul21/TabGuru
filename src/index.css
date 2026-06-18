@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom animations for the new tab page */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.05); }
+}
+
+.animate-float        { animation: float 4s ease-in-out infinite; }
+.animate-pulse-slow   { animation: pulse-slow 6s ease-in-out infinite; }
+.delay-700            { animation-delay: 700ms; }
+.delay-1500           { animation-delay: 1500ms; }
+.font-outfit          { font-family: 'Outfit', system-ui, sans-serif; }
+.font-inter           { font-family: 'Inter', system-ui, sans-serif; }
+
+/* Subtle scrollbar for any overflow areas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.3) transparent;
+}
