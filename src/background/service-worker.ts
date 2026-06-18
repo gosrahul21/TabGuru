@@ -47,6 +47,7 @@ const PURPOSE_PAGE = chrome.runtime.getURL('src/newtab/index.html');
 // URLs we must never intercept
 const SKIP_PATTERNS = [
   /^chrome(-extension)?:\/\//,
+  /^edge:\/\//,
   /^about:/,
   /^javascript:/,
   /^data:/,
@@ -60,7 +61,13 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const url = tab.pendingUrl ?? tab.url ?? '';
 
   // Skip blank tabs (handled by new-tab override), extension pages, and special URLs
-  if (!url || url === 'chrome://newtab/' || SKIP_PATTERNS.some((p) => p.test(url))) return;
+  if (
+    !url ||
+    url === 'chrome://newtab/' ||
+    url === 'edge://newtab/' ||
+    SKIP_PATTERNS.some((p) => p.test(url))
+  )
+    return;
 
   // Skip tabs already handled by the content-script link interceptor
   // (those already have a pending purpose stored)
@@ -70,6 +77,36 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   // Redirect the new tab to our purpose page, preserving the original URL
   const purposePageWithRedirect = `${PURPOSE_PAGE}?redirect=${encodeURIComponent(url)}`;
   chrome.tabs.update(tab.id, { url: purposePageWithRedirect });
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Only care about URL changes
+  if (!changeInfo.url) return;
+
+  const url = changeInfo.url;
+
+  // Skip blank pages, extension pages, and internal browser pages
+  if (
+    !url ||
+    url === 'chrome://newtab/' ||
+    url === 'edge://newtab/' ||
+    url.startsWith(PURPOSE_PAGE) ||
+    SKIP_PATTERNS.some((p) => p.test(url))
+  ) {
+    return;
+  }
+
+  // Check if tab has an active purpose
+  const purpose = await getPurpose(tabId);
+  if (!purpose) {
+    // Skip if there's a pending purpose (e.g. opened via link interception)
+    const hasPending = await hasPendingPurposeForUrl(url);
+    if (hasPending) return;
+
+    // Redirect to the purpose page, carrying the URL the user attempted to search/visit
+    const purposePageWithRedirect = `${PURPOSE_PAGE}?redirect=${encodeURIComponent(url)}`;
+    chrome.tabs.update(tabId, { url: purposePageWithRedirect });
+  }
 });
 
 // ─── Pause / Resume on Tab Focus Changes ─────────────────────────────────────
@@ -150,6 +187,11 @@ chrome.runtime.onMessage.addListener(
       // ── MARK_COMPLETE ──────────────────────────────────────────────────────
       case 'MARK_COMPLETE': {
         updatePurposeStatus(tabId, 'completed')
+          .then(async () => {
+            try {
+              await chrome.tabs.remove(tabId);
+            } catch { /* ignore if already closed */ }
+          })
           .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));

@@ -167,19 +167,19 @@ export default function NewTab() {
 
           {/* Destination — hidden when redirect URL is already known */}
           {!isRedirect && (
-          <div>
-            <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-widest font-inter">
-              Where are you going?{' '}
-              <span className="text-slate-600 normal-case tracking-normal">
-                (optional)
-              </span>
-            </label>
-            <SearchInput
-              value={destination}
-              onChange={setDestination}
-              onSubmit={handleSubmit}
-            />
-          </div>
+            <div>
+              <label className="block text-slate-400 text-xs font-semibold mb-2 uppercase tracking-widest font-inter">
+                Where are you going?{' '}
+                <span className="text-slate-600 normal-case tracking-normal">
+                  (optional)
+                </span>
+              </label>
+              <SearchInput
+                value={destination}
+                onChange={setDestination}
+                onSubmit={handleSubmit}
+              />
+            </div>
           )}
 
           {/* Continue button */}

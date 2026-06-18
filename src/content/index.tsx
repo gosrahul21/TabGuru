@@ -12,7 +12,6 @@ import LinkModal from './LinkModal';
 import { initLinkInterceptor } from './linkInterceptor';
 import type { ExtensionMessage, ExtensionResponse, TabPurpose } from '../types';
 import bannerStyles from './banner.css?inline';
-import ChildAwarenessBanner from './ChildAwarenessBanner';
 
 // ─── Shadow DOM host ──────────────────────────────────────────────────────────
 
@@ -122,18 +121,12 @@ function AppShell({ initialPurpose, initialChildren, tabId }: AppShellProps) {
 
   return (
     <>
-      {/* Purpose banner — only visible if this tab has an active purpose */}
-      {purpose && (
-        <div style={{ position: 'fixed', top: '16px', right: '16px' }}>
-          <Banner purpose={purpose} tabId={tabId} />
-        </div>
-      )}
-
-      {/* Child tab awareness banner */}
-      {activeChild && !isDismissed && (
-        <ChildAwarenessBanner
-          child={activeChild}
-          onDismiss={() => setIsDismissed(true)}
+      {/* Purpose banner / Launcher Overlay */}
+      {(purpose || activeChildren.length > 0) && (
+        <Banner
+          purpose={purpose}
+          tabId={tabId}
+          activeChildren={activeChildren}
         />
       )}
 

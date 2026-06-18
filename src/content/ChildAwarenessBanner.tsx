@@ -8,6 +8,35 @@ interface ChildAwarenessBannerProps {
 
 export default function ChildAwarenessBanner({ child, onDismiss }: ChildAwarenessBannerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [animationDone, setAnimationDone] = useState(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+
+    setIsDragging(true);
+    const startX = e.clientX - position.x;
+    const startY = e.clientY - position.y;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      setPosition({
+        x: moveEvent.clientX - startX,
+        y: moveEvent.clientY - startY,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [position]);
 
   const handleGoToTab = useCallback(async () => {
     setIsProcessing(true);
@@ -39,22 +68,31 @@ export default function ChildAwarenessBanner({ child, onDismiss }: ChildAwarenes
 
   return (
     <div
-      className="
-        fixed top-4 left-1/2 -translate-x-1/2 z-[2147483647]
-        pointer-events-auto banner-enter
+      onMouseDown={handleMouseDown}
+      onAnimationEnd={() => setAnimationDone(true)}
+      className={`
+        fixed top-4 left-1/2 z-[2147483647]
+        pointer-events-auto select-none
         rounded-2xl border border-white/10
         bg-[#0f172a]/95 backdrop-blur-xl
         shadow-[0_8px_32px_rgba(0,0,0,0.5)]
         p-3 px-4 min-w-[320px] max-w-[480px]
         flex items-center justify-between gap-4
-      "
-      style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+        transition-shadow duration-150
+        ${animationDone ? '' : 'banner-enter'}
+        ${isDragging ? 'shadow-[0_12px_48px_rgba(0,0,0,0.7)]' : ''}
+      `}
+      style={{
+        fontFamily: 'Inter, system-ui, sans-serif',
+        transform: `translate(calc(-50% + ${position.x}px), ${position.y}px)`,
+        cursor: isDragging ? 'grabbing' : 'grab',
+      }}
     >
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0 pointer-events-none">
         <span className="text-lg shrink-0">🌿</span>
         <div className="min-w-0">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">
-            Pending Sub-task
+            Active Child Tab
           </p>
           <p className="text-xs font-semibold text-slate-200 truncate leading-tight" title={child.purpose}>
             "{child.purpose}"
@@ -73,7 +111,7 @@ export default function ChildAwarenessBanner({ child, onDismiss }: ChildAwarenes
             border border-violet-500/30 shadow-md hover:shadow-lg
           "
         >
-          Go back
+          Go to Child
         </button>
         <button
           onClick={handleMarkComplete}
