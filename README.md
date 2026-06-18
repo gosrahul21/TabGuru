@@ -2,7 +2,7 @@
 
 # 🧙 TabGuru
 
-### *Move with purpose, Know what you are aware of, Every tab must have a purpose.*
+### *Every tab must have a purpose.*
 
 **A purpose-first browser extension that makes you pause, declare your intent, and browse with awareness.**
 
