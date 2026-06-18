@@ -75,7 +75,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   if (alreadyHandled) return;
 
   // Redirect the new tab to our purpose page, preserving the original URL
-  const purposePageWithRedirect = `${PURPOSE_PAGE}?redirect=${encodeURIComponent(url)}`;
+  const purposePageWithRedirect = `${PURPOSE_PAGE}?redirect=${encodeURIComponent(url)}&opener=${tab.openerTabId}`;
   chrome.tabs.update(tab.id, { url: purposePageWithRedirect });
 });
 

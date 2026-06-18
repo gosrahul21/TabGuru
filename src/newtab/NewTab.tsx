@@ -48,9 +48,14 @@ export default function NewTab() {
 
     try {
       // Get the current tab's ID from the background context
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tabId = tab.id ?? Date.now(); // fallback for dev
-      const openerTabId = tab.openerTabId;
+      const tab = await chrome.tabs.getCurrent();
+      const tabId = tab?.id ?? Date.now(); // fallback for dev
+      
+      const openerParam = new URLSearchParams(window.location.search).get('opener');
+      const explicitOpener = openerParam && openerParam !== 'undefined' ? parseInt(openerParam, 10) : undefined;
+      // Chrome automatically assigns openerTabId when you click the '+' button or Ctrl+T
+      // We want to preserve this relationship so they become child tasks of the active tab.
+      const openerTabId = explicitOpener ?? tab?.openerTabId;
 
       const now = Date.now();
       const newPurpose: TabPurpose = {
@@ -68,6 +73,7 @@ export default function NewTab() {
       };
 
       await savePurpose(newPurpose);
+      chrome.runtime.sendMessage({ type: 'BROADCAST_REFRESH' }).catch(() => {});
 
       // Navigate to destination — always the redirect URL if present
       const dest = (isRedirect ? redirectParam! : destination).trim();

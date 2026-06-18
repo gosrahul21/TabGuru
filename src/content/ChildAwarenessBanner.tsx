@@ -92,7 +92,7 @@ export default function ChildAwarenessBanner({ child, onDismiss }: ChildAwarenes
         <span className="text-lg shrink-0">🌿</span>
         <div className="min-w-0">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">
-            Active Child Tab
+            Pending sub task
           </p>
           <p className="text-xs font-semibold text-slate-200 truncate leading-tight" title={child.purpose}>
             "{child.purpose}"

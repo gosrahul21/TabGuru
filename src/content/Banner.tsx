@@ -237,7 +237,11 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
       >
-        🧙
+        <img
+          src={chrome.runtime.getURL('icons/icon128.png')}
+          alt="TabGuru"
+          className="w-10 h-10 object-contain drop-shadow-md pointer-events-none"
+        />
         {activeChildren.length > 0 && (
           <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 border border-[#0f172a] shadow-sm animate-pulse">
             <span className="text-[8px]">🌿</span>
@@ -271,7 +275,11 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
 
       {/* Header row */}
       <div className="flex items-start gap-2">
-        <span className="text-base mt-0.5 shrink-0">🧙</span>
+        <img
+          src={chrome.runtime.getURL('icons/icon128.png')}
+          alt="TabGuru"
+          className="w-5 h-5 mt-0.5 shrink-0 object-contain drop-shadow-sm pointer-events-none"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest leading-none mb-0.5">
             {purpose ? 'Purpose' : 'TabGuru'}
@@ -373,40 +381,46 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
       {activeChildren.length > 0 && (
         <>
           <div className="my-2 border-t border-white/[0.06]" />
-          <div className="bg-white/5 rounded-xl p-2.5 space-y-2 border border-white/[0.03]">
-            <div className="flex items-center gap-2 min-w-0 pointer-events-none">
-              <span className="text-sm shrink-0">🌿</span>
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">
-                  Active Child Tab
-                </p>
-                <p className="text-xs font-semibold text-slate-300 truncate leading-tight" title={activeChildren[activeChildren.length - 1].purpose}>
-                  "{activeChildren[activeChildren.length - 1].purpose}"
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-1.5 justify-end">
-              <button
-                onClick={() => handleGoToTab(activeChildren[activeChildren.length - 1].tabId)}
-                className="
-                  text-[9px] font-bold px-2 py-1 rounded-md
-                  bg-violet-600 hover:bg-violet-500 text-white
-                  transition-colors cursor-pointer shadow-sm
-                "
-              >
-                Go to Child
-              </button>
-              <button
-                onClick={() => handleMarkChildComplete(activeChildren[activeChildren.length - 1].tabId)}
-                className="
-                  text-[9px] font-bold px-2 py-1 rounded-md
-                  bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400
-                  border border-emerald-500/20 transition-colors cursor-pointer
-                "
-              >
-                Done
-              </button>
-            </div>
+          <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none px-1 mb-2">
+              Pending sub tasks
+            </p>
+            {[...activeChildren]
+              .sort((a, b) => b.startTime - a.startTime)
+              .map((child) => (
+                <div key={child.tabId} className="bg-white/5 rounded-xl p-2.5 space-y-2 border border-white/[0.03]">
+                  <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                    <span className="text-sm shrink-0">🌿</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-300 truncate leading-tight" title={child.purpose}>
+                        "{child.purpose}"
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5 justify-end">
+                    <button
+                      onClick={() => handleGoToTab(child.tabId)}
+                      className="
+                        text-[9px] font-bold px-2 py-1 rounded-md
+                        bg-violet-600 hover:bg-violet-500 text-white
+                        transition-colors cursor-pointer shadow-sm
+                      "
+                    >
+                      Go to Child
+                    </button>
+                    <button
+                      onClick={() => handleMarkChildComplete(child.tabId)}
+                      className="
+                        text-[9px] font-bold px-2 py-1 rounded-md
+                        bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400
+                        border border-emerald-500/20 transition-colors cursor-pointer
+                      "
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
         </>
       )}

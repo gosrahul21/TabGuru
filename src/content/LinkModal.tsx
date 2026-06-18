@@ -82,7 +82,11 @@ export default function LinkModal({ destinationUrl, openerTabId, onClose }: Prop
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🧙</span>
+            <img
+              src={chrome.runtime.getURL('icons/icon128.png')}
+              alt="TabGuru"
+              className="w-8 h-8 object-contain drop-shadow-sm pointer-events-none"
+            />
             <div>
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest leading-none mb-0.5">
                 Opening new tab
