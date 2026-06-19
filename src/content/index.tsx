@@ -72,6 +72,7 @@ function AppShell({ initialPurpose, initialChildren, tabId }: AppShellProps) {
   const [activeChildren, setActiveChildren] = useState<TabPurpose[]>(initialChildren);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [parentPurposeText, setParentPurposeText] = useState<string | null>(null);
 
   const fetchState = React.useCallback(async () => {
     try {
@@ -86,6 +87,23 @@ function AppShell({ initialPurpose, initialChildren, tabId }: AppShellProps) {
             : null;
         setPurpose(activePurp);
         setActiveChildren(response.activeChildren ?? []);
+
+        // Fetch parent purpose so breadcrumb updates on every REFRESH_STATE
+        if (activePurp?.openerTabId) {
+          try {
+            const parentRes: ExtensionResponse = await chrome.runtime.sendMessage({
+              type: 'GET_PURPOSE',
+              tabId: activePurp.openerTabId,
+            });
+            setParentPurposeText(
+              parentRes?.success && parentRes?.data?.purpose
+                ? parentRes.data.purpose
+                : 'Parent tab'
+            );
+          } catch { setParentPurposeText('Parent tab'); }
+        } else {
+          setParentPurposeText(null);
+        }
       }
     } catch {
       // Ignore context invalidated
@@ -128,6 +146,7 @@ function AppShell({ initialPurpose, initialChildren, tabId }: AppShellProps) {
           tabId={tabId}
           activeChildren={activeChildren}
           onRefresh={fetchState}
+          parentPurposeText={parentPurposeText}
         />
       )}
 

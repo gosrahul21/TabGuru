@@ -137,9 +137,10 @@ interface Props {
   tabId: number;
   activeChildren?: TabPurpose[];
   onRefresh?: () => void;
+  parentPurposeText?: string | null;
 }
 
-export default function Banner({ purpose: initialPurpose, tabId, activeChildren = [], onRefresh }: Props) {
+export default function Banner({ purpose: initialPurpose, tabId, activeChildren = [], onRefresh, parentPurposeText }: Props) {
   const [purpose, setPurpose] = useState<TabPurpose | null>(initialPurpose);
   const [minimized, setMinimized] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -149,7 +150,19 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [animationDone, setAnimationDone] = useState(false);
-  const [parentPurpose, setParentPurpose] = useState<string | null>(null);
+
+  // Inline editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus the input when edit mode is entered
+  useEffect(() => {
+    if (isEditing && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [isEditing]);
 
   // Sync state with props
   useEffect(() => {
@@ -191,7 +204,9 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (!minimized && (target.closest('button') || target.closest('a'))) return;
+    // Don't initiate drag on interactive elements or when editing
+    if (!minimized && (target.closest('button') || target.closest('a') || target.closest('input'))) return;
+    if (isEditing) return;
 
     setIsDragging(true);
     const startX = e.clientX - position.x;
@@ -250,16 +265,29 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
     }
   }, [onRefresh]);
 
-  // Fetch parent tab's purpose text for the breadcrumb
-  useEffect(() => {
-    if (!purpose?.openerTabId) { setParentPurpose(null); return; }
-    chrome.runtime.sendMessage({ type: 'GET_PURPOSE', tabId: purpose.openerTabId })
-      .then((res: any) => {
-        if (res?.success && res?.data?.purpose) setParentPurpose(res.data.purpose);
-        else setParentPurpose('Parent tab');
-      })
-      .catch(() => setParentPurpose('Parent tab'));
-  }, [purpose?.openerTabId]);
+  // Save renamed purpose text
+  const handleSavePurpose = useCallback(async () => {
+    const trimmed = editValue.trim();
+    setIsEditing(false);
+    if (!trimmed || trimmed === purpose?.purpose) return;
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'UPDATE_PURPOSE',
+        tabId,
+        payload: { purpose: trimmed } as any,
+      });
+      // Optimistically update local state so it feels instant
+      setPurpose((p) => p ? { ...p, purpose: trimmed } : p);
+    } catch (err) {
+      console.error('Failed to rename purpose:', err);
+    }
+  }, [editValue, purpose?.purpose, tabId]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  // Remove the old internal parent purpose fetch — now comes from AppShell as a prop
 
   const handleGoToParent = useCallback(async () => {
     if (!purpose?.openerTabId) return;
@@ -419,7 +447,7 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
         >
           <span className="text-[11px] leading-none">←</span>
           <span className="text-[9px] font-bold uppercase tracking-widest truncate">
-            {parentPurpose ?? 'Parent tab'}
+            {parentPurposeText ?? 'Parent tab'}
           </span>
         </button>
       )}
@@ -432,9 +460,39 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
           className="w-5 h-5 mt-0.5 shrink-0 object-contain drop-shadow-sm pointer-events-none"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-200 leading-snug truncate" title={purpose ? purpose.purpose : 'Browsing Context'}>
-            {purpose ? purpose.purpose : 'Browsing Context'}
-          </p>
+          {isEditing ? (
+            <input
+              ref={editInputRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSavePurpose();
+                if (e.key === 'Escape') handleCancelEdit();
+                e.stopPropagation();
+              }}
+              onBlur={handleSavePurpose}
+              className="
+                w-full text-sm font-semibold text-slate-100 leading-snug
+                bg-transparent border-b border-violet-500/60 outline-none
+                pb-0.5 placeholder-slate-600
+              "
+              placeholder="Rename task…"
+            />
+          ) : (
+            <p
+              className="text-sm font-semibold text-slate-200 leading-snug truncate cursor-text hover:text-white group"
+              title={`${purpose ? purpose.purpose : 'Browsing Context'} — click to rename`}
+              onClick={() => {
+                if (purpose) {
+                  setEditValue(purpose.purpose);
+                  setIsEditing(true);
+                }
+              }}
+            >
+              {purpose ? purpose.purpose : 'Browsing Context'}
+              <span className="ml-1 opacity-0 group-hover:opacity-40 text-[9px] text-slate-400 transition-opacity">✎</span>
+            </p>
+          )}
         </div>
         {/* Minimize */}
         <button

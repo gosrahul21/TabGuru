@@ -35,9 +35,10 @@ export type MessageType =
   | 'EXTEND_TIMER'
   | 'TOGGLE_PAUSE'
   | 'PURPOSE_SAVED'
-  | 'OPEN_TAB_WITH_PURPOSE'  // Link interception: open new tab with a pre-set purpose
+  | 'OPEN_TAB_WITH_PURPOSE'
   | 'BROADCAST_REFRESH'
-  | 'ACTIVATE_TAB';
+  | 'ACTIVATE_TAB'
+  | 'UPDATE_PURPOSE';
 
 export interface ExtensionMessage {
   type: MessageType;

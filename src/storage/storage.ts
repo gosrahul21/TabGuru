@@ -35,6 +35,15 @@ export async function updatePurposeStatus(
   }
 }
 
+export async function updatePurposeText(tabId: number, newText: string): Promise<void> {
+  const result = await chrome.storage.local.get(KEY_ACTIVE);
+  const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;
+  if (all[String(tabId)]) {
+    all[String(tabId)].purpose = newText;
+    await chrome.storage.local.set({ [KEY_ACTIVE]: all });
+  }
+}
+
 export async function removePurpose(tabId: number): Promise<void> {
   const result = await chrome.storage.local.get(KEY_ACTIVE);
   const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;

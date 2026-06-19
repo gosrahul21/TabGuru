@@ -2,6 +2,7 @@ import {
   getPurpose,
   removePurpose,
   updatePurposeStatus,
+  updatePurposeText,
   extendPurpose,
   pausePurpose,
   resumePurpose,
@@ -209,6 +210,17 @@ chrome.runtime.onMessage.addListener(
       }
 
       // ── EXTEND_TIMER ───────────────────────────────────────────────────────
+      // ── UPDATE_PURPOSE (rename task) ────────────────────────────────────────
+      case 'UPDATE_PURPOSE': {
+        const newText = message.payload?.purpose?.trim();
+        if (!newText) { sendResponse({ success: false, error: 'Empty purpose' }); return false; }
+        updatePurposeText(tabId, newText)
+          .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
       case 'EXTEND_TIMER': {
         const extra = message.payload?.extraMinutes ?? 5;
         extendPurpose(tabId, extra)
