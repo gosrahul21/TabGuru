@@ -127,6 +127,7 @@ function AppShell({ initialPurpose, initialChildren, tabId }: AppShellProps) {
           purpose={purpose}
           tabId={tabId}
           activeChildren={activeChildren}
+          onRefresh={fetchState}
         />
       )}
 

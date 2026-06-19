@@ -9,6 +9,7 @@ import {
   consumePendingPurpose,
   hasPendingPurposeForUrl,
   getActiveChildren,
+  getAllDescendants,
 } from '../storage/storage';
 import type { ExtensionMessage, ExtensionResponse } from '../types';
 
@@ -186,8 +187,17 @@ chrome.runtime.onMessage.addListener(
 
       // ── MARK_COMPLETE ──────────────────────────────────────────────────────
       case 'MARK_COMPLETE': {
+        const shouldCloseChildren = message.payload?.closeChildren ?? false;
         updatePurposeStatus(tabId, 'completed')
           .then(async () => {
+            // Recursively close entire descendant tree if requested
+            if (shouldCloseChildren) {
+              const descendants = await getAllDescendants(tabId);
+              for (const desc of descendants) {
+                await updatePurposeStatus(desc.tabId, 'completed').catch(() => {});
+                await chrome.tabs.remove(desc.tabId).catch(() => {});
+              }
+            }
             try {
               await chrome.tabs.remove(tabId);
             } catch { /* ignore if already closed */ }

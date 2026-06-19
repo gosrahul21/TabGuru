@@ -19,9 +19,15 @@ function Orbs() {
 
 export default function NewTab() {
   // Detect if we were redirected from right-click "Open in new tab"
-  // Background service worker sets ?redirect=<url> in that case.
-  const redirectParam = new URLSearchParams(window.location.search).get('redirect');
+  // Background service worker sets ?redirect=<url>&opener=<tabId> in that case.
+  const params = new URLSearchParams(window.location.search);
+  const redirectParam = params.get('redirect');
   const isRedirect = Boolean(redirectParam);
+  const explicitOpenerFromUrl = (() => {
+    const raw = params.get('opener');
+    const n = raw && raw !== 'undefined' ? parseInt(raw, 10) : NaN;
+    return isNaN(n) ? undefined : n;
+  })();
 
   const [purpose, setPurpose] = useState('');
   const [duration, setDuration] = useState<number>(15);
@@ -31,12 +37,39 @@ export default function NewTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Parent tab linking state
+  // Right-click: starts linked (true). + button: starts standalone (false).
+  const [linkedToParent, setLinkedToParent] = useState(isRedirect);
+  const [rawOpenerTabId, setRawOpenerTabId] = useState<number | undefined>(explicitOpenerFromUrl);
+  const [parentPurposeText, setParentPurposeText] = useState<string | null>(null);
+
   // Load suggestions from history (only shown after ≥3 entries)
   useEffect(() => {
     getRecentPurposes().then((recent) => {
       if (recent.length >= 3) setSuggestions(recent.slice(0, 5));
     });
   }, []);
+
+  // Fetch the parent tab's purpose text to display in the chip / badge
+  useEffect(() => {
+    async function fetchParentInfo() {
+      let openerId = explicitOpenerFromUrl;
+      if (!openerId) {
+        // + button case — Chrome sets openerTabId on the tab object
+        const tab = await chrome.tabs.getCurrent().catch(() => null);
+        openerId = tab?.openerTabId;
+      }
+      if (!openerId) return;
+      setRawOpenerTabId(openerId);
+      try {
+        const res = await chrome.runtime.sendMessage({ type: 'GET_PURPOSE', tabId: openerId });
+        if (res?.success && res?.data?.purpose) {
+          setParentPurposeText(res.data.purpose);
+        }
+      } catch { /* no purpose on parent — don't show chip */ }
+    }
+    fetchParentInfo();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(async () => {
     if (!purpose.trim()) {
@@ -50,12 +83,9 @@ export default function NewTab() {
       // Get the current tab's ID from the background context
       const tab = await chrome.tabs.getCurrent();
       const tabId = tab?.id ?? Date.now(); // fallback for dev
-      
-      const openerParam = new URLSearchParams(window.location.search).get('opener');
-      const explicitOpener = openerParam && openerParam !== 'undefined' ? parseInt(openerParam, 10) : undefined;
-      // Chrome automatically assigns openerTabId when you click the '+' button or Ctrl+T
-      // We want to preserve this relationship so they become child tasks of the active tab.
-      const openerTabId = explicitOpener ?? tab?.openerTabId;
+
+      // openerTabId is fully controlled by the parent-link UI toggle
+      const openerTabId = linkedToParent ? rawOpenerTabId : undefined;
 
       const now = Date.now();
       const newPurpose: TabPurpose = {
@@ -97,7 +127,7 @@ export default function NewTab() {
       setError('Something went wrong. Please try again.');
       setIsSubmitting(false);
     }
-  }, [purpose, duration, destination]);
+  }, [purpose, duration, destination, linkedToParent, rawOpenerTabId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) handleSubmit();
@@ -131,7 +161,7 @@ export default function NewTab() {
         {/* Glass card */}
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_8px_60px_rgba(0,0,0,0.6)] p-7 space-y-5">
 
-          {/* Redirect context banner — shown when opened via right-click */}
+          {/* ── Right-click: destination badge ── */}
           {isRedirect && redirectParam && (
             <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
               <span className="text-base shrink-0">🔗</span>
@@ -141,6 +171,26 @@ export default function NewTab() {
                   {new URL(redirectParam).hostname.replace(/^www\./, '')}
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* ── Right-click: parent badge (pre-filled, dismissible with ✕) ── */}
+          {isRedirect && parentPurposeText && linkedToParent && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-base shrink-0">🌿</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-violet-400 font-semibold uppercase tracking-widest">From</p>
+                  <p className="text-xs text-slate-300 truncate font-inter">{parentPurposeText}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setLinkedToParent(false)}
+                title="Open as independent tab"
+                className="shrink-0 text-slate-500 hover:text-slate-300 hover:bg-white/10 p-1.5 rounded-lg transition-colors text-xs leading-none cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
           )}
           {/* Question */}
@@ -173,6 +223,36 @@ export default function NewTab() {
             </label>
             <DurationChips selected={duration} onChange={setDuration} />
           </div>
+
+          {/* ── + button: opt-in parent chip (only shown if parent has an active purpose) ── */}
+          {!isRedirect && parentPurposeText && (
+            <button
+              type="button"
+              onClick={() => setLinkedToParent((v) => !v)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all duration-150 ${
+                linkedToParent
+                  ? 'bg-violet-500/15 border-violet-500/30'
+                  : 'bg-white/5 border-white/10 hover:border-white/20'
+              }`}
+            >
+              <span className="text-base shrink-0">🌿</span>
+              <div className="min-w-0 flex-1">
+                <p className={`text-[10px] font-semibold uppercase tracking-widest font-inter ${
+                  linkedToParent ? 'text-violet-400' : 'text-slate-500'
+                }`}>
+                  {linkedToParent ? 'Linked to parent' : 'Link to parent?'}
+                </p>
+                <p className={`text-xs truncate font-inter ${
+                  linkedToParent ? 'text-slate-200' : 'text-slate-500'
+                }`}>{parentPurposeText}</p>
+              </div>
+              <span className={`shrink-0 text-sm font-bold ${
+                linkedToParent ? 'text-violet-400' : 'text-slate-600'
+              }`}>
+                {linkedToParent ? '✓' : '+'}
+              </span>
+            </button>
+          )}
 
           {/* Destination — hidden when redirect URL is already known */}
           {!isRedirect && (

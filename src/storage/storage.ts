@@ -163,6 +163,31 @@ export async function getActiveChildren(parentTabId: number): Promise<TabPurpose
   );
 }
 
+/**
+ * Recursively collect ALL descendants (children, grandchildren, …) of a tab.
+ * Uses BFS so the order is breadth-first — safe to close in sequence.
+ */
+export async function getAllDescendants(rootTabId: number): Promise<TabPurpose[]> {
+  const result = await chrome.storage.local.get(KEY_ACTIVE);
+  const all = Object.values((result[KEY_ACTIVE] ?? {}) as ActivePurposes);
+
+  const descendants: TabPurpose[] = [];
+  const queue: number[] = [rootTabId];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const children = all.filter(
+      (p) => p.openerTabId === current && p.status === 'active'
+    );
+    for (const child of children) {
+      descendants.push(child);
+      queue.push(child.tabId); // recurse into grandchildren
+    }
+  }
+
+  return descendants;
+}
+
 // ─── Recent Purposes (Suggestions) ───────────────────────────────────────────
 
 export async function getRecentPurposes(): Promise<string[]> {

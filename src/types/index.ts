@@ -47,6 +47,7 @@ export interface ExtensionMessage {
     url?: string;            // for OPEN_TAB_WITH_PURPOSE
     durationMinutes?: number;
     targetTabId?: number;    // for ACTIVATE_TAB
+    closeChildren?: boolean; // for MARK_COMPLETE — cascade close child tabs
   };
 }
 

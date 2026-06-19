@@ -61,22 +61,95 @@ function GoalToast({ onDone }: { onDone: () => void }) {
   );
 }
 
+// ─── Confirm close children dialog ───────────────────────────────────────────
+
+const PREF_KEY = 'tabguru_skip_close_confirm';
+
+function ConfirmCloseDialog({
+  childCount,
+  onConfirm,
+  onCancel,
+}: {
+  childCount: number;
+  onConfirm: (dontAskAgain: boolean) => void;
+  onCancel: () => void;
+}) {
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
+  return (
+    <div className="
+      absolute inset-0 z-50 flex flex-col items-center justify-center
+      rounded-2xl bg-[#080e1e]/97 backdrop-blur-md border border-white/10 p-4 gap-3
+    ">
+      <span className="text-2xl">🗂️</span>
+
+      <div className="text-center space-y-1">
+        <p className="text-sm font-bold text-slate-100">Close child tabs?</p>
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          This will also close{' '}
+          <span className="text-slate-200 font-semibold">
+            {childCount} child tab{childCount > 1 ? 's' : ''}
+          </span>.
+        </p>
+      </div>
+
+      {/* Don't ask me again */}
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={dontAskAgain}
+          onChange={(e) => setDontAskAgain(e.target.checked)}
+          className="w-3 h-3 accent-violet-500 cursor-pointer"
+        />
+        <span className="text-[10px] text-slate-500">Don't ask me again</span>
+      </label>
+
+      <div className="flex gap-2 w-full">
+        <button
+          onClick={onCancel}
+          className="
+            flex-1 py-1.5 rounded-lg text-[11px] font-semibold
+            bg-white/5 hover:bg-white/10 text-slate-400
+            border border-white/10 transition-all cursor-pointer
+          "
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => onConfirm(dontAskAgain)}
+          className="
+            flex-1 py-1.5 rounded-lg text-[11px] font-semibold
+            bg-red-500/80 hover:bg-red-500 text-white
+            border border-red-400/20 transition-all cursor-pointer
+          "
+        >
+          Close All
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Banner Component ────────────────────────────────────────────────────
 
 interface Props {
   purpose: TabPurpose | null;
   tabId: number;
   activeChildren?: TabPurpose[];
+  onRefresh?: () => void;
 }
 
-export default function Banner({ purpose: initialPurpose, tabId, activeChildren = [] }: Props) {
+export default function Banner({ purpose: initialPurpose, tabId, activeChildren = [], onRefresh }: Props) {
   const [purpose, setPurpose] = useState<TabPurpose | null>(initialPurpose);
   const [minimized, setMinimized] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [closeChildrenOnComplete, setCloseChildrenOnComplete] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [animationDone, setAnimationDone] = useState(false);
+  const [parentPurpose, setParentPurpose] = useState<string | null>(null);
 
   // Sync state with props
   useEffect(() => {
@@ -170,12 +243,37 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
         type: 'MARK_COMPLETE',
         tabId: childTabId,
       });
+      // Force UI refresh after completing the child
+      if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Failed to mark child tab complete:', err);
     }
-  }, []);
+  }, [onRefresh]);
 
-  const { mins, secs, isUrgent, isExpired, isPaused } = useCountdown(purpose);
+  // Fetch parent tab's purpose text for the breadcrumb
+  useEffect(() => {
+    if (!purpose?.openerTabId) { setParentPurpose(null); return; }
+    chrome.runtime.sendMessage({ type: 'GET_PURPOSE', tabId: purpose.openerTabId })
+      .then((res: any) => {
+        if (res?.success && res?.data?.purpose) setParentPurpose(res.data.purpose);
+        else setParentPurpose('Parent tab');
+      })
+      .catch(() => setParentPurpose('Parent tab'));
+  }, [purpose?.openerTabId]);
+
+  const handleGoToParent = useCallback(async () => {
+    if (!purpose?.openerTabId) return;
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'ACTIVATE_TAB',
+        payload: { targetTabId: purpose.openerTabId },
+      });
+    } catch (err) {
+      console.error('Failed to navigate to parent tab:', err);
+    }
+  }, [purpose?.openerTabId]);
+
+  const { mins, secs, isUrgent, isExpired } = useCountdown(purpose);
 
   // Extend timer
   const handleExtend = useCallback(
@@ -203,14 +301,43 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
     if (res.success && res.data) setPurpose(res.data);
   }, [tabId]);
 
-  // Mark complete
-  const handleComplete = useCallback(() => {
+  // Mark complete — checks children count & user preference before proceeding
+  const handleComplete = useCallback(async () => {
+    if (activeChildren.length > 0) {
+      const pref = await chrome.storage.local.get(PREF_KEY);
+      if (pref[PREF_KEY]) {
+        // Preference: skip dialog, always close children
+        setCloseChildrenOnComplete(true);
+        setShowToast(true);
+      } else {
+        setShowConfirmDialog(true);
+      }
+    } else {
+      setCloseChildrenOnComplete(false);
+      setShowToast(true);
+    }
+  }, [activeChildren.length]);
+
+  const handleConfirmClose = useCallback(async (dontAskAgain: boolean) => {
+    setShowConfirmDialog(false);
+    if (dontAskAgain) {
+      await chrome.storage.local.set({ [PREF_KEY]: true });
+    }
+    setCloseChildrenOnComplete(true);
     setShowToast(true);
   }, []);
 
+  const handleCancelClose = useCallback(() => {
+    setShowConfirmDialog(false);
+  }, []);
+
   const handleToastDone = useCallback(async () => {
-    await sendMsg({ type: 'MARK_COMPLETE', tabId });
-  }, [tabId]);
+    await sendMsg({
+      type: 'MARK_COMPLETE',
+      tabId,
+      payload: { closeChildren: closeChildrenOnComplete },
+    });
+  }, [tabId, closeChildrenOnComplete]);
 
   if (minimized) {
     const tooltipText = purpose
@@ -272,6 +399,30 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
       }}
     >
       {showToast && <GoalToast onDone={handleToastDone} />}
+      {showConfirmDialog && (
+        <ConfirmCloseDialog
+          childCount={activeChildren.length}
+          onConfirm={handleConfirmClose}
+          onCancel={handleCancelClose}
+        />
+      )}
+
+      {/* Parent breadcrumb — only on child tabs */}
+      {purpose?.openerTabId && (
+        <button
+          onClick={handleGoToParent}
+          className="
+            w-full flex items-center gap-1.5 mb-2.5 px-2 py-1 rounded-lg
+            bg-white/5 hover:bg-white/10 border border-white/[0.06]
+            text-slate-500 hover:text-slate-300 transition-colors text-left cursor-pointer
+          "
+        >
+          <span className="text-[11px] leading-none">←</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest truncate">
+            {parentPurpose ?? 'Parent tab'}
+          </span>
+        </button>
+      )}
 
       {/* Header row */}
       <div className="flex items-start gap-2">
@@ -281,9 +432,6 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
           className="w-5 h-5 mt-0.5 shrink-0 object-contain drop-shadow-sm pointer-events-none"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest leading-none mb-0.5">
-            {purpose ? 'Purpose' : 'TabGuru'}
-          </p>
           <p className="text-sm font-semibold text-slate-200 leading-snug truncate" title={purpose ? purpose.purpose : 'Browsing Context'}>
             {purpose ? purpose.purpose : 'Browsing Context'}
           </p>
@@ -308,51 +456,30 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
           {/* Timer row */}
           <div className="mt-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              <button
-                onClick={handleTogglePause}
-                className="text-xs p-1 -ml-1 rounded flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/10 transition-colors cursor-pointer"
-                title={isPaused ? "Resume timer" : "Pause timer"}
-              >
-                {isPaused ? '▶️' : '⏸'}
-              </button>
               <span
                 className={`text-sm font-mono font-bold tabular-nums ${
-                  isExpired
-                    ? 'text-red-400'
-                    : isPaused
-                    ? 'text-slate-600'
-                    : isUrgent
-                    ? 'timer-urgent'
-                    : 'text-slate-300'
+                  isExpired ? 'text-red-400' : isUrgent ? 'timer-urgent' : 'text-slate-300'
                 }`}
               >
                 {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
               </span>
-              {isPaused && !isExpired && (
-                <span className="text-[10px] text-slate-600 font-semibold">Paused</span>
-              )}
               {isExpired && (
                 <span className="text-[10px] text-red-400 font-semibold">Time's up!</span>
               )}
             </div>
 
-            {/* Extend buttons */}
-            <div className="flex gap-1">
-              {[5, 10].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => handleExtend(n)}
-                  className="
-                    text-[10px] font-semibold px-2 py-0.5 rounded-md
-                    bg-white/5 border border-white/10 text-slate-500
-                    hover:border-violet-500/40 hover:text-slate-300 hover:bg-violet-500/10
-                    transition-all duration-150
-                  "
-                >
-                  +{n}m
-                </button>
-              ))}
-            </div>
+            {/* Extend button */}
+            <button
+              onClick={() => handleExtend(5)}
+              className="
+                text-[10px] font-semibold px-2 py-0.5 rounded-md
+                bg-white/5 border border-white/10 text-slate-500
+                hover:border-violet-500/40 hover:text-slate-300 hover:bg-violet-500/10
+                transition-all duration-150
+              "
+            >
+              +5m
+            </button>
           </div>
 
           {/* Divider */}
@@ -402,11 +529,12 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
                       onClick={() => handleGoToTab(child.tabId)}
                       className="
                         text-[9px] font-bold px-2 py-1 rounded-md
-                        bg-violet-600 hover:bg-violet-500 text-white
-                        transition-colors cursor-pointer shadow-sm
+                        bg-violet-600/20 hover:bg-violet-600/30 text-violet-400
+                        border border-violet-500/20 transition-colors cursor-pointer
+                        flex items-center gap-1
                       "
                     >
-                      Go to Child
+                      Go to Tab <span className="text-[10px]">→</span>
                     </button>
                     <button
                       onClick={() => handleMarkChildComplete(child.tabId)}
