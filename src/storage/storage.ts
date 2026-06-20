@@ -19,7 +19,7 @@ export async function savePurpose(purpose: TabPurpose): Promise<void> {
   await chrome.storage.local.set({ [KEY_ACTIVE]: all });
 
   if (purpose.purpose.trim()) {
-    await addRecentPurpose(purpose.purpose.trim());
+    await addRecentPurpose(purpose.purpose.trim(), purpose.destinationUrl);
   }
 }
 
@@ -237,14 +237,25 @@ export async function getAllDescendants(rootTabId: number): Promise<TabPurpose[]
 
 // ─── Recent Purposes (Suggestions) ───────────────────────────────────────────
 
-export async function getRecentPurposes(): Promise<string[]> {
-  const result = await chrome.storage.local.get(KEY_RECENT);
-  return (result[KEY_RECENT] as string[]) ?? [];
+export interface RecentPurpose {
+  purpose: string;
+  url?: string;
 }
 
-async function addRecentPurpose(purpose: string): Promise<void> {
+export async function getRecentPurposes(): Promise<RecentPurpose[]> {
   const result = await chrome.storage.local.get(KEY_RECENT);
-  let recent = ((result[KEY_RECENT] as string[]) ?? []);
-  recent = [purpose, ...recent.filter((p) => p !== purpose)].slice(0, 10);
+  const raw = (result[KEY_RECENT] as any[]) || [];
+  return raw.map((item: any) => 
+    typeof item === 'string' ? { purpose: item } : item
+  );
+}
+
+async function addRecentPurpose(purpose: string, url?: string): Promise<void> {
+  const result = await chrome.storage.local.get(KEY_RECENT);
+  let recent = (result[KEY_RECENT] as any[]) || [];
+  // filter out older ones with same purpose
+  recent = recent.filter((p) => (typeof p === 'string' ? p : p.purpose) !== purpose);
+  recent.unshift({ purpose, url });
+  recent = recent.slice(0, 10);
   await chrome.storage.local.set({ [KEY_RECENT]: recent });
 }

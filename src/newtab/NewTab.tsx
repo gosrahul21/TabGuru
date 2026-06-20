@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { savePurpose, getRecentPurposes } from '../storage/storage';
+import { savePurpose, getRecentPurposes, type RecentPurpose } from '../storage/storage';
 import type { TabPurpose } from '../types';
 import PurposeInput from './components/PurposeInput';
 import DurationChips from './components/DurationChips';
@@ -33,7 +33,7 @@ export default function NewTab() {
   const [duration, setDuration] = useState<number>(15);
   // Pre-fill destination if we have a redirect param
   const [destination, setDestination] = useState(redirectParam ?? '');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<RecentPurpose[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,10 +44,10 @@ export default function NewTab() {
   const [rawOpenerTabId, setRawOpenerTabId] = useState<number | undefined>(explicitOpenerFromUrl);
   const [parentPurposeText, setParentPurposeText] = useState<string | null>(null);
 
-  // Load suggestions from history (only shown after ≥3 entries)
+  // Load suggestions from history
   useEffect(() => {
     getRecentPurposes().then((recent) => {
-      if (recent.length >= 3) setSuggestions(recent.slice(0, 5));
+      if (recent.length > 0) setSuggestions(recent.slice(0, 5));
     });
   }, []);
 
@@ -213,7 +213,10 @@ export default function NewTab() {
           {suggestions.length > 0 && (
             <SuggestionChips
               items={suggestions}
-              onSelect={(s) => setPurpose(s)}
+              onSelect={(s) => {
+                setPurpose(s.purpose);
+                if (s.url) setDestination(s.url);
+              }}
             />
           )}
 
