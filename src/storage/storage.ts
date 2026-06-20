@@ -44,6 +44,16 @@ export async function updatePurposeText(tabId: number, newText: string): Promise
   }
 }
 
+/** Remove the openerTabId from a purpose, making it a standalone (unlinked) tab. */
+export async function detachFromParent(tabId: number): Promise<void> {
+  const result = await chrome.storage.local.get(KEY_ACTIVE);
+  const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;
+  if (all[String(tabId)]) {
+    delete all[String(tabId)].openerTabId;
+    await chrome.storage.local.set({ [KEY_ACTIVE]: all });
+  }
+}
+
 export async function removePurpose(tabId: number): Promise<void> {
   const result = await chrome.storage.local.get(KEY_ACTIVE);
   const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;
@@ -167,9 +177,37 @@ export async function consumePendingPurpose(
 export async function getActiveChildren(parentTabId: number): Promise<TabPurpose[]> {
   const result = await chrome.storage.local.get(KEY_ACTIVE);
   const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;
-  return Object.values(all).filter(
+
+  const candidates = Object.values(all).filter(
     (p) => p.openerTabId === parentTabId && p.status === 'active'
   );
+
+  if (candidates.length === 0) return [];
+
+  // Cross-check: verify each candidate tab still actually exists in Chrome.
+  // If the user closed a tab via the browser X button and the onRemoved cleanup
+  // was missed (e.g. MV3 service worker suspension), this self-heals.
+  const existingTabs = await chrome.tabs.query({});
+  const existingIds = new Set(existingTabs.map((t) => t.id).filter(Boolean) as number[]);
+
+  const verified: TabPurpose[] = [];
+  const staleIds: number[] = [];
+
+  for (const p of candidates) {
+    if (existingIds.has(p.tabId)) {
+      verified.push(p);
+    } else {
+      staleIds.push(p.tabId); // tab was closed without cleanup
+    }
+  }
+
+  // Self-heal: remove stale entries from storage so they never reappear
+  if (staleIds.length > 0) {
+    for (const id of staleIds) delete all[String(id)];
+    await chrome.storage.local.set({ [KEY_ACTIVE]: all });
+  }
+
+  return verified;
 }
 
 /**

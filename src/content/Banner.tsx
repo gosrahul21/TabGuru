@@ -301,6 +301,21 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
     }
   }, [purpose?.openerTabId]);
 
+  const handleDetachFromParent = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent triggering the GoToParent click
+    if (!tabId) return;
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'DETACH_PARENT',
+        tabId,
+      });
+      // Optimistic update: instantly remove openerTabId from local state
+      setPurpose((p) => p ? { ...p, openerTabId: undefined } : p);
+    } catch (err) {
+      console.error('Failed to detach parent:', err);
+    }
+  }, [tabId]);
+
   const { mins, secs, isUrgent, isExpired } = useCountdown(purpose);
 
   // Extend timer
@@ -437,19 +452,46 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
 
       {/* Parent breadcrumb — only on child tabs */}
       {purpose?.openerTabId && (
-        <button
-          onClick={handleGoToParent}
-          className="
-            w-full flex items-center gap-1.5 mb-2.5 px-2 py-1 rounded-lg
-            bg-white/5 hover:bg-white/10 border border-white/[0.06]
-            text-slate-500 hover:text-slate-300 transition-colors text-left cursor-pointer
-          "
-        >
-          <span className="text-[11px] leading-none">←</span>
-          <span className="text-[9px] font-bold uppercase tracking-widest truncate">
-            {parentPurposeText ?? 'Parent tab'}
-          </span>
-        </button>
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="flex-1 flex items-stretch rounded-lg bg-white/5 border border-white/[0.06] overflow-hidden min-w-0">
+            <button
+              onClick={handleGoToParent}
+              className="
+                flex-1 flex items-center gap-1.5 px-2 py-1.5
+                hover:bg-white/10
+                text-slate-500 hover:text-slate-300 transition-colors text-left cursor-pointer min-w-0
+              "
+            >
+              <span className="text-[11px] leading-none shrink-0">←</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest truncate">
+                {parentPurposeText ?? 'Parent tab'}
+              </span>
+            </button>
+            <button
+              onClick={handleDetachFromParent}
+              title="Detach from parent"
+              className="
+                shrink-0 flex items-center justify-center w-7
+                hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors cursor-pointer border-l border-white/[0.06]
+              "
+            >
+              <span className="text-[10px] leading-none">✕</span>
+            </button>
+          </div>
+          {/* Minimize button (Next to breadcrumb) */}
+          <button
+            onClick={() => setMinimized(true)}
+            className="
+              shrink-0 flex items-center justify-center w-7 h-7 rounded-lg
+              text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors cursor-pointer
+            "
+            title="Minimize"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* Header row */}
@@ -472,15 +514,15 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
               }}
               onBlur={handleSavePurpose}
               className="
-                w-full text-sm font-semibold text-slate-100 leading-snug
+                w-full text-[15px] font-bold text-white leading-snug
                 bg-transparent border-b border-violet-500/60 outline-none
-                pb-0.5 placeholder-slate-600
+                pb-0.5 placeholder-slate-500
               "
               placeholder="Rename task…"
             />
           ) : (
             <p
-              className="text-sm font-semibold text-slate-200 leading-snug truncate cursor-text hover:text-white group"
+              className="text-[15px] font-bold text-white leading-snug truncate cursor-text group"
               title={`${purpose ? purpose.purpose : 'Browsing Context'} — click to rename`}
               onClick={() => {
                 if (purpose) {
@@ -494,19 +536,20 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
             </p>
           )}
         </div>
-        {/* Minimize */}
-        <button
-          onClick={() => setMinimized(true)}
-          className="
-            shrink-0 text-slate-400 hover:text-slate-200 hover:bg-white/10
-            transition-colors p-1 rounded cursor-pointer leading-none mt-0.5
-          "
-          title="Minimize"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
-          </svg>
-        </button>
+        {!purpose?.openerTabId && (
+          <button
+            onClick={() => setMinimized(true)}
+            className="
+              shrink-0 flex items-center justify-center w-6 h-6 rounded-lg mt-0.5
+              text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors cursor-pointer
+            "
+            title="Minimize"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {purpose && (

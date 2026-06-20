@@ -3,6 +3,7 @@ import {
   removePurpose,
   updatePurposeStatus,
   updatePurposeText,
+  detachFromParent,
   extendPurpose,
   pausePurpose,
   resumePurpose,
@@ -30,6 +31,8 @@ async function broadcastMessage(message: any) {
 }
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
+  // Mark as completed first so any in-flight GET_PURPOSE calls exclude it immediately
+  await updatePurposeStatus(tabId, 'completed').catch(() => {});
   await removePurpose(tabId);
   await broadcastMessage({ type: 'REFRESH_STATE' });
 });
@@ -210,6 +213,15 @@ chrome.runtime.onMessage.addListener(
       }
 
       // ── EXTEND_TIMER ───────────────────────────────────────────────────────
+      // ── DETACH_PARENT ─────────────────────────────────────────────────
+      case 'DETACH_PARENT': {
+        detachFromParent(tabId)
+          .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
       // ── UPDATE_PURPOSE (rename task) ────────────────────────────────────────
       case 'UPDATE_PURPOSE': {
         const newText = message.payload?.purpose?.trim();

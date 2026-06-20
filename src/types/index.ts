@@ -38,7 +38,8 @@ export type MessageType =
   | 'OPEN_TAB_WITH_PURPOSE'
   | 'BROADCAST_REFRESH'
   | 'ACTIVATE_TAB'
-  | 'UPDATE_PURPOSE';
+  | 'UPDATE_PURPOSE'
+  | 'DETACH_PARENT';
 
 export interface ExtensionMessage {
   type: MessageType;

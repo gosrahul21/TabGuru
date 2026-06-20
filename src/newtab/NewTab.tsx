@@ -37,9 +37,10 @@ export default function NewTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Parent tab linking state
-  // Right-click: starts linked (true). + button: starts standalone (false).
-  const [linkedToParent, setLinkedToParent] = useState(isRedirect);
+  // Parent tab linking state.
+  // Both right-click and + button default to LINKED (true).
+  // User can click the chip (+ button) or the ✕ badge (right-click) to detach.
+  const [linkedToParent, setLinkedToParent] = useState(true);
   const [rawOpenerTabId, setRawOpenerTabId] = useState<number | undefined>(explicitOpenerFromUrl);
   const [parentPurposeText, setParentPurposeText] = useState<string | null>(null);
 
@@ -224,7 +225,7 @@ export default function NewTab() {
             <DurationChips selected={duration} onChange={setDuration} />
           </div>
 
-          {/* ── + button: opt-in parent chip (only shown if parent has an active purpose) ── */}
+          {/* ── + button: parent chip (linked by default, click to detach) ── */}
           {!isRedirect && parentPurposeText && (
             <button
               type="button"
@@ -240,16 +241,17 @@ export default function NewTab() {
                 <p className={`text-[10px] font-semibold uppercase tracking-widest font-inter ${
                   linkedToParent ? 'text-violet-400' : 'text-slate-500'
                 }`}>
-                  {linkedToParent ? 'Linked to parent' : 'Link to parent?'}
+                  {linkedToParent ? 'Subtask of' : 'Open standalone'}
                 </p>
                 <p className={`text-xs truncate font-inter ${
-                  linkedToParent ? 'text-slate-200' : 'text-slate-500'
+                  linkedToParent ? 'text-slate-200' : 'text-slate-500 line-through'
                 }`}>{parentPurposeText}</p>
               </div>
-              <span className={`shrink-0 text-sm font-bold ${
-                linkedToParent ? 'text-violet-400' : 'text-slate-600'
+              {/* Right icon: ✕ when linked (click to detach), + when detached (click to re-link) */}
+              <span className={`shrink-0 text-xs font-bold leading-none ${
+                linkedToParent ? 'text-slate-500 hover:text-red-400' : 'text-slate-600'
               }`}>
-                {linkedToParent ? '✓' : '+'}
+                {linkedToParent ? '✕' : '+'}
               </span>
             </button>
           )}
