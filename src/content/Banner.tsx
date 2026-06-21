@@ -433,6 +433,7 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
         font-inter transition-shadow duration-150
         ${animationDone ? '' : 'banner-enter'}
         ${isDragging ? 'shadow-[0_12px_48px_rgba(0,0,0,0.75)]' : 'shadow-[0_8px_40px_rgba(0,0,0,0.6)]'}
+        ${isExpired && !isDragging ? 'animate-border-glow' : ''}
       `}
       style={{
         fontFamily: 'Inter, system-ui, sans-serif',
