@@ -17,6 +17,8 @@ import {
   setExcludedDomains,
   isUrlExcluded,
   getIntentionForUrl,
+  getShortcuts,
+  setShortcuts,
 } from '../storage/storage';
 import type { ExtensionMessage, ExtensionResponse } from '../types';
 
@@ -381,6 +383,27 @@ chrome.runtime.onMessage.addListener(
           return false;
         }
         setExcludedDomains(domains)
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── GET_SHORTCUTS ──────────────────────────────────────────────────────
+      case 'GET_SHORTCUTS': {
+        getShortcuts()
+          .then((shortcuts) => sendResponse({ success: true, shortcuts }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── SET_SHORTCUTS ──────────────────────────────────────────────────────
+      case 'SET_SHORTCUTS': {
+        const shortcuts = (message.payload as any)?.shortcuts as import('../types').Shortcut[] | undefined;
+        if (!Array.isArray(shortcuts)) {
+          sendResponse({ success: false, error: 'shortcuts must be an array' });
+          return false;
+        }
+        setShortcuts(shortcuts)
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
         return true;

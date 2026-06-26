@@ -29,6 +29,16 @@ export interface ExcludedDomain {
   intention?: string;    // Optional saved purpose shown when this domain is visited
 }
 
+// ─── Shortcut ────────────────────────────────────────────────────────────────
+
+export interface Shortcut {
+  id: string; // unique identifier
+  name: string; // e.g. "Check Emails"
+  purpose: string;
+  destinationUrl?: string;
+  durationMinutes: number;
+}
+
 // ─── Storage Keys ────────────────────────────────────────────────────────────
 
 export const STORAGE_KEY_ACTIVE = 'active_purposes' as const;
@@ -48,7 +58,9 @@ export type MessageType =
   | 'UPDATE_PURPOSE'
   | 'DETACH_PARENT'
   | 'GET_EXCLUDED_DOMAINS'
-  | 'SET_EXCLUDED_DOMAINS';
+  | 'SET_EXCLUDED_DOMAINS'
+  | 'GET_SHORTCUTS'
+  | 'SET_SHORTCUTS';
 
 export interface ExtensionMessage {
   type: MessageType;
@@ -77,5 +89,6 @@ export interface ExtensionResponse {
   data?: TabPurpose | null;
   activeChildren?: TabPurpose[];
   excludedDomains?: ExcludedDomain[];
+  shortcuts?: Shortcut[];
   error?: string;
 }

@@ -1,9 +1,10 @@
-import type { TabPurpose, ActivePurposes, PendingPurpose, ExcludedDomain } from '../types';
+import type { TabPurpose, ActivePurposes, PendingPurpose, ExcludedDomain, Shortcut } from '../types';
 
 const KEY_ACTIVE  = 'active_purposes';
 const KEY_RECENT  = 'recent_purposes';
 const KEY_PENDING = 'pending_purposes'; // short-lived, TTL 30s
 const KEY_EXCLUDED_DOMAINS = 'excluded_domains';
+const KEY_SHORTCUTS = 'shortcuts';
 
 // Default domains where TabGuru should never intercept
 const DEFAULT_EXCLUDED_DOMAINS: ExcludedDomain[] = [{ domain: 'localhost' }];
@@ -328,4 +329,21 @@ export async function getIntentionForUrl(url: string): Promise<string | null> {
   const domains = await getExcludedDomains();
   const match = domains.find(({ domain: d }) => matchesDomain(hostname, d));
   return match?.intention?.trim() || null;
+}
+
+// ─── Shortcuts ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns the user's saved shortcuts.
+ */
+export async function getShortcuts(): Promise<Shortcut[]> {
+  const result = await chrome.storage.local.get(KEY_SHORTCUTS);
+  return (result[KEY_SHORTCUTS] as Shortcut[]) ?? [];
+}
+
+/**
+ * Overwrite the shortcuts list.
+ */
+export async function setShortcuts(shortcuts: Shortcut[]): Promise<void> {
+  await chrome.storage.local.set({ [KEY_SHORTCUTS]: shortcuts });
 }

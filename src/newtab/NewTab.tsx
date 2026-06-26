@@ -6,6 +6,7 @@ import DurationChips from './components/DurationChips';
 import SuggestionChips from './components/SuggestionChips';
 import SearchInput from './components/SearchInput';
 import ExcludedDomains from './components/ExcludedDomains';
+import ShortcutsList from './components/ShortcutsList';
 
 // Ambient floating orbs for background
 function Orbs() {
@@ -41,6 +42,7 @@ export default function NewTab() {
   // Pre-fill destination if we have a redirect param
   const [destination, setDestination] = useState(redirectParam ?? '');
   const [suggestions, setSuggestions] = useState<RecentPurpose[]>([]);
+  const [shortcuts, setShortcuts] = useState<import('../types').Shortcut[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showSettings, setShowSettings] = useState(false);
@@ -57,6 +59,18 @@ export default function NewTab() {
     getRecentPurposes().then((recent) => {
       if (recent.length > 0) setSuggestions(recent.slice(0, 5));
     });
+  }, []);
+
+  // Load shortcuts
+  useEffect(() => {
+    chrome.runtime
+      .sendMessage({ type: 'GET_SHORTCUTS' })
+      .then((res) => {
+        if (res?.success && Array.isArray(res.shortcuts)) {
+          setShortcuts(res.shortcuts);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Fetch the parent tab's purpose text to display in the chip / badge
@@ -145,6 +159,36 @@ export default function NewTab() {
     if (e.key === 'Enter' && !e.shiftKey) handleSubmit();
   };
 
+  const handleSaveShortcut = () => {
+    const enteredPurpose = purpose.trim();
+    if (!enteredPurpose) {
+      setError('Please enter an intention to save it as a shortcut.');
+      return;
+    }
+
+    const newShortcut: import('../types').Shortcut = {
+      id: Date.now().toString(),
+      name: enteredPurpose,
+      purpose: enteredPurpose,
+      destinationUrl: destination.trim() || undefined,
+      durationMinutes: duration,
+    };
+
+    const updated = [...shortcuts, newShortcut];
+    chrome.runtime.sendMessage({
+      type: 'SET_SHORTCUTS',
+      payload: { shortcuts: updated } as any,
+    }).then(() => setShortcuts(updated)).catch(() => {});
+  };
+
+  const handleRemoveShortcut = (id: string) => {
+    const updated = shortcuts.filter(s => s.id !== id);
+    chrome.runtime.sendMessage({
+      type: 'SET_SHORTCUTS',
+      payload: { shortcuts: updated } as any,
+    }).then(() => setShortcuts(updated)).catch(() => {});
+  };
+
   return (
     <div
       className="relative h-screen w-full bg-[#0a0a12] font-outfit overflow-y-auto"
@@ -228,6 +272,16 @@ export default function NewTab() {
             </p>
           </div>
 
+          <ShortcutsList
+            shortcuts={shortcuts}
+            onSelect={(s) => {
+              setPurpose(s.purpose);
+              if (s.destinationUrl) setDestination(s.destinationUrl);
+              setDuration(s.durationMinutes);
+            }}
+            onRemove={handleRemoveShortcut}
+          />
+
           {/* Suggestions (only shown once history builds up) */}
           {suggestions.length > 0 && (
             <SuggestionChips
@@ -295,32 +349,45 @@ export default function NewTab() {
             </div>
           )}
 
-          {/* Continue button */}
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide
-              bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600
-              hover:from-indigo-400 hover:via-violet-400 hover:to-purple-500
-              text-white shadow-[0_4px_24px_rgba(139,92,246,0.4)]
-              hover:shadow-[0_4px_32px_rgba(139,92,246,0.6)]
-              transform hover:scale-[1.01] active:scale-[0.99]
-              transition-all duration-200
-              disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none
-              focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-transparent"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Starting session…
-              </span>
-            ) : (
-              'Continue →'
-            )}
-          </button>
+          {/* Continue & Save actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="flex-1 py-3.5 rounded-xl font-semibold text-sm tracking-wide
+                bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600
+                hover:from-indigo-400 hover:via-violet-400 hover:to-purple-500
+                text-white shadow-[0_4px_24px_rgba(139,92,246,0.4)]
+                hover:shadow-[0_4px_32px_rgba(139,92,246,0.6)]
+                transform hover:scale-[1.01] active:scale-[0.99]
+                transition-all duration-200
+                disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none
+                focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-transparent"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Starting session…
+                </span>
+              ) : (
+                'Continue →'
+              )}
+            </button>
+            <button
+              onClick={handleSaveShortcut}
+              title="Save current form as a shortcut"
+              className="px-4 py-3.5 rounded-xl font-semibold text-sm tracking-wide
+                bg-white/5 border border-white/10 text-slate-300
+                hover:bg-violet-500/15 hover:border-violet-500/30 hover:text-violet-300
+                transform hover:scale-[1.02] active:scale-[0.98]
+                transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            >
+              ⭐ Save
+            </button>
+          </div>
 
           <p className="text-center text-xs text-slate-600 font-inter">
             Purpose is optional — you can always rename it later.
