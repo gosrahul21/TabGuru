@@ -22,6 +22,13 @@ export interface TabPurpose {
 // Map of tabId (as string key) → TabPurpose
 export type ActivePurposes = Record<string, TabPurpose>;
 
+// ─── Excluded Domain ─────────────────────────────────────────────────────────
+
+export interface ExcludedDomain {
+  domain: string;        // e.g. "localhost", "staging.company.com", "*.corp.com"
+  intention?: string;    // Optional saved purpose shown when this domain is visited
+}
+
 // ─── Storage Keys ────────────────────────────────────────────────────────────
 
 export const STORAGE_KEY_ACTIVE = 'active_purposes' as const;
@@ -39,7 +46,9 @@ export type MessageType =
   | 'BROADCAST_REFRESH'
   | 'ACTIVATE_TAB'
   | 'UPDATE_PURPOSE'
-  | 'DETACH_PARENT';
+  | 'DETACH_PARENT'
+  | 'GET_EXCLUDED_DOMAINS'
+  | 'SET_EXCLUDED_DOMAINS';
 
 export interface ExtensionMessage {
   type: MessageType;
@@ -67,5 +76,6 @@ export interface ExtensionResponse {
   success: boolean;
   data?: TabPurpose | null;
   activeChildren?: TabPurpose[];
+  excludedDomains?: ExcludedDomain[];
   error?: string;
 }

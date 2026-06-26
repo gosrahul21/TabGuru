@@ -1,5 +1,6 @@
 import {
   getPurpose,
+  savePurpose,
   removePurpose,
   updatePurposeStatus,
   updatePurposeText,
@@ -12,6 +13,10 @@ import {
   hasPendingPurposeForUrl,
   getActiveChildren,
   getAllDescendants,
+  getExcludedDomains,
+  setExcludedDomains,
+  isUrlExcluded,
+  getIntentionForUrl,
 } from '../storage/storage';
 import type { ExtensionMessage, ExtensionResponse } from '../types';
 
@@ -79,6 +84,23 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const alreadyHandled = await hasPendingPurposeForUrl(url);
   if (alreadyHandled) return;
 
+  // Auto-track excluded domains: store a pending purpose with saved intention (or hostname label)
+  // so the new tab's content script picks it up and shows a banner.
+  // The tab opens at its real destination (no redirect); we just book-keep it.
+  if (await isUrlExcluded(url)) {
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, '');
+      const savedIntention = await getIntentionForUrl(url);
+      await storePendingPurpose({
+        url,
+        purpose: savedIntention || `Browsing ${hostname}`,
+        durationMinutes: 15,
+        createdAt: Date.now(),
+      });
+    } catch { /* malformed URL — skip tracking */ }
+    return;
+  }
+
   // Redirect the new tab to our purpose page, preserving the original URL
   const purposePageWithRedirect = `${PURPOSE_PAGE}?redirect=${encodeURIComponent(url)}&opener=${tab.openerTabId}`;
   chrome.tabs.update(tab.id, { url: purposePageWithRedirect });
@@ -98,6 +120,34 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     url.startsWith(PURPOSE_PAGE) ||
     SKIP_PATTERNS.some((p) => p.test(url))
   ) {
+    return;
+  }
+
+  // Auto-track excluded domains: save a purpose directly to this tab
+  // so it shows up in the parent's child list and gets a banner (no redirect).
+  if (await isUrlExcluded(url)) {
+    const existing = await getPurpose(tabId);
+    if (!existing) {
+      try {
+        const hostname = new URL(url).hostname.replace(/^www\./, '');
+        const savedIntention = await getIntentionForUrl(url);
+        const now = Date.now();
+        const openerTabId = tab.openerTabId ?? undefined;
+        await savePurpose({
+          tabId,
+          purpose: savedIntention || `Browsing ${hostname}`,
+          durationMinutes: 15,
+          startTime: now,
+          endTime: now + 15 * 60_000,
+          status: 'active',
+          destinationUrl: url,
+          accumulatedMs: 0,
+          lastActivatedAt: now,
+          openerTabId,
+        });
+        await broadcastMessage({ type: 'REFRESH_STATE' });
+      } catch { /* malformed URL — skip tracking */ }
+    }
     return;
   }
 
@@ -264,14 +314,17 @@ chrome.runtime.onMessage.addListener(
       // Stores a pending purpose, then creates the tab.
       case 'OPEN_TAB_WITH_PURPOSE': {
         const { url, purpose, durationMinutes } = message.payload ?? {};
-        if (!url || !purpose || !durationMinutes) {
+        if (!url || !durationMinutes) {
           sendResponse({ success: false, error: 'Missing payload fields' });
           return false;
         }
 
+        // Purpose is optional — fall back to a generic label
+        const resolvedPurpose = (purpose ?? '').trim() || 'Quick browse';
+
         storePendingPurpose({
           url,
-          purpose,
+          purpose: resolvedPurpose,
           durationMinutes,
           createdAt: Date.now(),
         })
@@ -308,6 +361,27 @@ chrome.runtime.onMessage.addListener(
             }).catch(() => {});
             sendResponse({ success: true });
           })
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── GET_EXCLUDED_DOMAINS ───────────────────────────────────────────────
+      case 'GET_EXCLUDED_DOMAINS': {
+        getExcludedDomains()
+          .then((domains) => sendResponse({ success: true, excludedDomains: domains }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── SET_EXCLUDED_DOMAINS ───────────────────────────────────────────────
+      case 'SET_EXCLUDED_DOMAINS': {
+        const domains = (message.payload as any)?.domains as import('../types').ExcludedDomain[] | undefined;
+        if (!Array.isArray(domains)) {
+          sendResponse({ success: false, error: 'domains must be an array' });
+          return false;
+        }
+        setExcludedDomains(domains)
+          .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
         return true;
       }

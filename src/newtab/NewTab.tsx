@@ -5,6 +5,7 @@ import PurposeInput from './components/PurposeInput';
 import DurationChips from './components/DurationChips';
 import SuggestionChips from './components/SuggestionChips';
 import SearchInput from './components/SearchInput';
+import ExcludedDomains from './components/ExcludedDomains';
 
 // Ambient floating orbs for background
 function Orbs() {
@@ -29,6 +30,12 @@ export default function NewTab() {
     return isNaN(n) ? undefined : n;
   })();
 
+  // Hostname of the destination — used as fallback purpose label when intent is skipped
+  const redirectHostname = (() => {
+    if (!redirectParam) return '';
+    try { return new URL(redirectParam).hostname.replace(/^www\./, ''); } catch { return ''; }
+  })();
+
   const [purpose, setPurpose] = useState('');
   const [duration, setDuration] = useState<number>(15);
   // Pre-fill destination if we have a redirect param
@@ -36,6 +43,7 @@ export default function NewTab() {
   const [suggestions, setSuggestions] = useState<RecentPurpose[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
 
   // Parent tab linking state.
   // Both right-click and + button default to LINKED (true).
@@ -73,10 +81,6 @@ export default function NewTab() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(async () => {
-    if (!purpose.trim()) {
-      setError('Please describe your purpose for opening this tab.');
-      return;
-    }
     setError('');
     setIsSubmitting(true);
 
@@ -88,10 +92,17 @@ export default function NewTab() {
       // openerTabId is fully controlled by the parent-link UI toggle
       const openerTabId = linkedToParent ? rawOpenerTabId : undefined;
 
+      // Purpose is optional — fall back in order of specificity:
+      // 1. User-typed intent  2. Subtask label from parent  3. Destination hostname  4. Generic
+      const resolvedPurpose = purpose.trim()
+        || (linkedToParent && parentPurposeText ? `Subtask of: ${parentPurposeText}` : '')
+        || (redirectHostname ? `Browsing ${redirectHostname}` : '')
+        || 'Quick browse';
+
       const now = Date.now();
       const newPurpose: TabPurpose = {
         tabId,
-        purpose: purpose.trim(),
+        purpose: resolvedPurpose,
         durationMinutes: duration,
         startTime: now,
         endTime: now + duration * 60_000, // kept for reference
@@ -128,7 +139,7 @@ export default function NewTab() {
       setError('Something went wrong. Please try again.');
       setIsSubmitting(false);
     }
-  }, [purpose, duration, destination, linkedToParent, rawOpenerTabId]);
+  }, [purpose, duration, destination, linkedToParent, rawOpenerTabId, parentPurposeText, redirectHostname]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) handleSubmit();
@@ -136,13 +147,13 @@ export default function NewTab() {
 
   return (
     <div
-      className="relative min-h-screen w-full flex items-center justify-center bg-[#0a0a12] font-outfit overflow-hidden"
+      className="relative h-screen w-full bg-[#0a0a12] font-outfit overflow-y-auto"
       onKeyDown={handleKeyDown}
     >
       <Orbs />
 
       {/* Main card */}
-      <div className="relative z-10 w-full max-w-xl mx-4">
+      <div className="relative z-10 w-full max-w-xl mx-auto px-4 py-10">
         {/* Logo & Headline */}
         <div className="mb-8 select-none flex flex-col items-center">
           <div className="flex flex-row items-center gap-4">
@@ -198,15 +209,23 @@ export default function NewTab() {
           <div>
             <label className="block text-slate-200 text-base font-semibold mb-2">
               Why are you opening this tab?
+              <span className="ml-2 text-slate-500 text-sm font-normal normal-case tracking-normal">(optional)</span>
             </label>
             <PurposeInput
               value={purpose}
               onChange={setPurpose}
-              hasError={!!error && !purpose.trim()}
+              hasError={false}
             />
             {error && (
               <p className="mt-1.5 text-xs text-red-400 font-inter">{error}</p>
             )}
+            <p className="mt-1.5 text-[11px] text-slate-600 font-inter">
+              Skip to auto-label as{' '}
+              <span className="text-slate-500 font-mono">
+                &quot;{redirectHostname ? `Browsing ${redirectHostname}` : (linkedToParent && parentPurposeText ? `Subtask of: ${parentPurposeText}` : 'Quick browse')}&quot;
+              </span>
+              {' '}— editable later.
+            </p>
           </div>
 
           {/* Suggestions (only shown once history builds up) */}
@@ -304,8 +323,29 @@ export default function NewTab() {
           </button>
 
           <p className="text-center text-xs text-slate-600 font-inter">
-            Every tab deserves a purpose. No skipping.
+            Purpose is optional — you can always rename it later.
           </p>
+
+          {/* ── Settings section ── */}
+          <div className="border-t border-white/[0.06] pt-3">
+            <button
+              type="button"
+              onClick={() => setShowSettings((v) => !v)}
+              className="w-full flex items-center justify-between text-[11px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer select-none"
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="text-base leading-none">⚙️</span>
+                Settings
+              </span>
+              <span className={`transition-transform duration-200 ${showSettings ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+
+            {showSettings && (
+              <div className="mt-3">
+                <ExcludedDomains />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

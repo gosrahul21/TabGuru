@@ -1,8 +1,12 @@
-import type { TabPurpose, ActivePurposes, PendingPurpose } from '../types';
+import type { TabPurpose, ActivePurposes, PendingPurpose, ExcludedDomain } from '../types';
 
 const KEY_ACTIVE  = 'active_purposes';
 const KEY_RECENT  = 'recent_purposes';
 const KEY_PENDING = 'pending_purposes'; // short-lived, TTL 30s
+const KEY_EXCLUDED_DOMAINS = 'excluded_domains';
+
+// Default domains where TabGuru should never intercept
+const DEFAULT_EXCLUDED_DOMAINS: ExcludedDomain[] = [{ domain: 'localhost' }];
 
 // ─── Active Purpose CRUD ─────────────────────────────────────────────────────
 
@@ -258,4 +262,70 @@ async function addRecentPurpose(purpose: string, url?: string): Promise<void> {
   recent.unshift({ purpose, url });
   recent = recent.slice(0, 10);
   await chrome.storage.local.set({ [KEY_RECENT]: recent });
+}
+
+// ─── Excluded Domains ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the list of domains excluded from TabGuru interception.
+ * Supports both the new ExcludedDomain object format and the legacy string[] format
+ * (transparently migrates old data on first read).
+ */
+export async function getExcludedDomains(): Promise<ExcludedDomain[]> {
+  const result = await chrome.storage.local.get(KEY_EXCLUDED_DOMAINS);
+  if (result[KEY_EXCLUDED_DOMAINS] === undefined) {
+    // First run — seed defaults
+    await chrome.storage.local.set({ [KEY_EXCLUDED_DOMAINS]: DEFAULT_EXCLUDED_DOMAINS });
+    return [...DEFAULT_EXCLUDED_DOMAINS];
+  }
+  const raw = result[KEY_EXCLUDED_DOMAINS] as (string | ExcludedDomain)[];
+  // Backward compat: migrate plain strings to object format
+  return raw.map((item) =>
+    typeof item === 'string' ? { domain: item } : item
+  );
+}
+
+/** Overwrite the full excluded domains list. */
+export async function setExcludedDomains(domains: ExcludedDomain[]): Promise<void> {
+  await chrome.storage.local.set({ [KEY_EXCLUDED_DOMAINS]: domains });
+}
+
+/** Helper: match hostname against a single domain pattern (supports wildcard prefix). */
+function matchesDomain(hostname: string, d: string): boolean {
+  if (d.startsWith('*.')) {
+    const base = d.slice(2);
+    return hostname === base || hostname.endsWith(`.${base}`);
+  }
+  return hostname === d || hostname === `www.${d}` || `www.${hostname}` === d;
+}
+
+/**
+ * Returns true if the given URL's hostname is in the excluded domains list.
+ * Supports exact hostname match and wildcard prefix (e.g. "*.company.com").
+ */
+export async function isUrlExcluded(url: string): Promise<boolean> {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return false;
+  }
+  const domains = await getExcludedDomains();
+  return domains.some(({ domain: d }) => matchesDomain(hostname, d));
+}
+
+/**
+ * Returns the saved intention for an excluded domain URL, or null if none is set.
+ * Used to populate the auto-purpose label when a tracked excluded-domain tab is created.
+ */
+export async function getIntentionForUrl(url: string): Promise<string | null> {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  const domains = await getExcludedDomains();
+  const match = domains.find(({ domain: d }) => matchesDomain(hostname, d));
+  return match?.intention?.trim() || null;
 }
