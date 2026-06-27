@@ -74,7 +74,17 @@ export async function extendPurpose(
   const all = (result[KEY_ACTIVE] ?? {}) as ActivePurposes;
   const entry = all[String(tabId)];
   if (entry) {
-    entry.durationMinutes += extraMinutes;
+    const liveMs = entry.lastActivatedAt !== null ? Date.now() - entry.lastActivatedAt : 0;
+    const elapsedMs = entry.accumulatedMs + liveMs;
+    const elapsedMinutes = elapsedMs / 60_000;
+    
+    // If the timer is already expired (elapsed > duration), 
+    // simply adding extraMinutes to the old duration might not be enough to make it positive.
+    // So we ensure the new duration is at least (current elapsed + extraMinutes).
+    entry.durationMinutes = Math.max(
+      entry.durationMinutes + extraMinutes,
+      elapsedMinutes + extraMinutes
+    );
     await chrome.storage.local.set({ [KEY_ACTIVE]: all });
   }
 }

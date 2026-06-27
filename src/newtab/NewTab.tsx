@@ -54,10 +54,9 @@ export default function NewTab() {
   const [rawOpenerTabId, setRawOpenerTabId] = useState<number | undefined>(explicitOpenerFromUrl);
   const [parentPurposeText, setParentPurposeText] = useState<string | null>(null);
 
-  // Load suggestions from history
   useEffect(() => {
     getRecentPurposes().then((recent) => {
-      if (recent.length > 0) setSuggestions(recent.slice(0, 5));
+      if (recent.length > 0) setSuggestions(recent.slice(0, 3));
     });
   }, []);
 
@@ -188,6 +187,17 @@ export default function NewTab() {
       payload: { shortcuts: updated } as any,
     }).then(() => setShortcuts(updated)).catch(() => {});
   };
+
+  const isTypingDestination = destination.trim().length > 0;
+  const isTypingPurpose = purpose.trim().length > 0;
+  
+  const matchingShortcuts = (isTypingDestination || isTypingPurpose) 
+    ? shortcuts.filter(s => {
+        const destMatch = isTypingDestination && s.destinationUrl?.toLowerCase().includes(destination.toLowerCase());
+        const purposeMatch = isTypingPurpose && s.purpose.toLowerCase().includes(purpose.toLowerCase());
+        return destMatch || purposeMatch;
+      }).slice(0, 3)
+    : [];
 
   return (
     <div
@@ -346,6 +356,40 @@ export default function NewTab() {
                 onChange={setDestination}
                 onSubmit={handleSubmit}
               />
+              {/* Contextual matching shortcuts */}
+              {matchingShortcuts.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[10px] text-slate-500 font-inter mb-1.5 uppercase tracking-widest font-semibold">
+                    Matching Shortcuts
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {matchingShortcuts.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setPurpose(s.purpose);
+                          if (s.destinationUrl) setDestination(s.destinationUrl);
+                          setDuration(s.durationMinutes);
+                        }}
+                        className="
+                          flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-left
+                          bg-violet-500/10 border border-violet-500/20 text-violet-300
+                          hover:bg-violet-500/20 hover:text-violet-200 hover:border-violet-500/40
+                          transition-all duration-150 text-xs font-medium
+                        "
+                      >
+                        ⚡ {s.name}
+                        {s.destinationUrl && (
+                          <span className="text-[10px] text-violet-400/60 font-normal">
+                            ({new URL(s.destinationUrl.startsWith('http') ? s.destinationUrl : `https://${s.destinationUrl}`).hostname.replace(/^www\./, '')})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

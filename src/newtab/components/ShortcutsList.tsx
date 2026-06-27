@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Shortcut } from '../../types';
 
 interface Props {
@@ -7,7 +8,13 @@ interface Props {
 }
 
 export default function ShortcutsList({ shortcuts, onSelect, onRemove }: Props) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (shortcuts.length === 0) return null;
+
+  const maxVisible = 3;
+  const visibleShortcuts = isExpanded ? shortcuts : shortcuts.slice(0, maxVisible);
+  const hiddenCount = shortcuts.length - maxVisible;
 
   return (
     <div className="mb-6">
@@ -15,7 +22,7 @@ export default function ShortcutsList({ shortcuts, onSelect, onRemove }: Props) 
         Shortcuts
       </p>
       <div className="flex gap-2 flex-wrap">
-        {shortcuts.map((shortcut) => (
+        {visibleShortcuts.map((shortcut) => (
           <div
             key={shortcut.id}
             className="group relative flex items-stretch max-w-[220px]"
@@ -62,6 +69,20 @@ export default function ShortcutsList({ shortcuts, onSelect, onRemove }: Props) 
             </button>
           </div>
         ))}
+        
+        {!isExpanded && hiddenCount > 0 && (
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="
+              flex items-center px-3 py-2 rounded-xl text-xs font-semibold
+              bg-white/5 border border-white/10 text-slate-400
+              hover:bg-white/10 hover:text-slate-200 hover:border-white/20
+              transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-violet-500
+            "
+          >
+            More...
+          </button>
+        )}
       </div>
     </div>
   );
