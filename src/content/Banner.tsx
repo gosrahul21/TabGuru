@@ -318,7 +318,7 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
 
   const { mins, secs, isUrgent, isExpired } = useCountdown(purpose);
 
-  // Extend timer
+  // Extend timer — also logs a drift event if the timer was already expired
   const handleExtend = useCallback(
     async (extra: number) => {
       if (!tabId) return;
@@ -329,8 +329,18 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
       };
       const res = await sendMsg(msg);
       if (res.success && res.data) setPurpose(res.data);
+
+      // Log drift if the timer was expired when the user chose to extend
+      if (isExpired && purpose) {
+        let domain = '';
+        try { domain = purpose.destinationUrl ? new URL(purpose.destinationUrl).hostname.replace(/^www\./, '') : window.location.hostname; } catch { /* ignore */ }
+        chrome.runtime.sendMessage({
+          type: 'LOG_DRIFT_EVENT',
+          payload: { domain, purposeText: purpose.purpose, userAction: 'continue' } as any,
+        }).catch(() => {});
+      }
     },
-    [tabId]
+    [tabId, isExpired, purpose]
   );
 
   // Toggle pause

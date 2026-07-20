@@ -21,6 +21,16 @@ import {
   setShortcuts,
 } from '../storage/storage';
 import type { ExtensionMessage, ExtensionResponse } from '../types';
+import {
+  logCompletedPurpose,
+  logDriftEvent,
+  getDailyStats,
+  getWeeklyStats,
+  getAllHistory,
+  getDriftHotspots,
+  toDateString,
+} from '../db/indexedDb';
+import { classifyPurpose } from '../db/classifier';
 
 // ─── Tab Lifecycle ────────────────────────────────────────────────────────────
 
@@ -38,8 +48,38 @@ async function broadcastMessage(message: any) {
 }
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
+  // Snapshot the purpose BEFORE marking complete & removing
+  const existing = await getPurpose(tabId).catch(() => null);
+
   // Mark as completed first so any in-flight GET_PURPOSE calls exclude it immediately
   await updatePurposeStatus(tabId, 'completed').catch(() => {});
+
+  // Log to IndexedDB for analytics
+  if (existing) {
+    const now = Date.now();
+    const liveMs = existing.lastActivatedAt !== null ? now - existing.lastActivatedAt : 0;
+    const timeSpentMs = existing.accumulatedMs + liveMs;
+    let domain = '';
+    try { domain = existing.destinationUrl ? new URL(existing.destinationUrl).hostname.replace(/^www\./, '') : ''; } catch { /* ignore */ }
+    const category = classifyPurpose(existing.purpose, domain);
+    
+    // If it was already marked completed (via MARK_COMPLETE), log as completed. 
+    // Otherwise, the user just closed the tab, so it's abandoned.
+    const finalStatus = existing.status === 'completed' ? 'completed' : 'abandoned';
+    
+    logCompletedPurpose({
+      date: toDateString(existing.startTime),
+      purpose: existing.purpose,
+      startTime: existing.startTime,
+      endTime: now,
+      timeSpentMs,
+      durationMinutesAllocated: existing.durationMinutes,
+      status: finalStatus,
+      category,
+      domain,
+    }).catch(() => { /* non-critical */ });
+  }
+
   await removePurpose(tabId);
   await broadcastMessage({ type: 'REFRESH_STATE' });
 });
@@ -202,7 +242,15 @@ chrome.runtime.onMessage.addListener(
   ) => {
     const tabId = message.tabId ?? sender.tab?.id;
 
-    if (!tabId) {
+    const globalMessages = [
+      'GET_EXCLUDED_DOMAINS', 'SET_EXCLUDED_DOMAINS',
+      'GET_SHORTCUTS', 'SET_SHORTCUTS',
+      'LOG_DRIFT_EVENT', 'GET_DAILY_STATS',
+      'GET_WEEKLY_STATS', 'GET_HISTORY', 'GET_DRIFT_HOTSPOTS',
+      'BROADCAST_REFRESH'
+    ];
+
+    if (!tabId && !globalMessages.includes(message.type)) {
       sendResponse({ success: false, error: 'No tabId found' });
       return false;
     }
@@ -405,6 +453,55 @@ chrome.runtime.onMessage.addListener(
         }
         setShortcuts(shortcuts)
           .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── LOG_DRIFT_EVENT ────────────────────────────────────────────────────
+      case 'LOG_DRIFT_EVENT': {
+        const payload = (message.payload as any);
+        logDriftEvent({
+          date: toDateString(Date.now()),
+          timestamp: Date.now(),
+          domain: payload?.domain ?? '',
+          purposeText: payload?.purposeText ?? '',
+          userAction: payload?.userAction ?? 'continue',
+        })
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── GET_DAILY_STATS ───────────────────────────────────────────────────
+      case 'GET_DAILY_STATS': {
+        const date = (message.payload as any)?.date ?? toDateString(Date.now());
+        getDailyStats(date)
+          .then((stats) => sendResponse({ success: true, data: stats as any }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── GET_WEEKLY_STATS ──────────────────────────────────────────────────
+      case 'GET_WEEKLY_STATS': {
+        getWeeklyStats()
+          .then((days) => sendResponse({ success: true, data: days as any }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── GET_HISTORY ───────────────────────────────────────────────────────
+      case 'GET_HISTORY': {
+        const limit = (message.payload as any)?.limit ?? 200;
+        getAllHistory(limit)
+          .then((history) => sendResponse({ success: true, data: history as any }))
+          .catch((err) => sendResponse({ success: false, error: String(err) }));
+        return true;
+      }
+
+      // ── GET_DRIFT_HOTSPOTS ────────────────────────────────────────────────
+      case 'GET_DRIFT_HOTSPOTS': {
+        getDriftHotspots(7)
+          .then((hotspots) => sendResponse({ success: true, data: hotspots as any }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
         return true;
       }

@@ -460,9 +460,25 @@ export default function NewTab() {
         </div>
 
         {/* Footer */}
-        <p className="text-center mt-5 text-slate-700 text-xs font-inter">
-          TabGuru — Every tab starts with a purpose.
-        </p>
+        <div className="flex items-center justify-between mt-5 px-1">
+          <p className="text-slate-700 text-xs font-inter">
+            TabGuru — Every tab starts with a purpose.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const dashboardUrl = chrome.runtime.getURL('src/dashboard/index.html');
+              window.open(dashboardUrl, '_blank');
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+              text-slate-500 hover:text-violet-300 hover:bg-violet-500/10 border border-transparent
+              hover:border-violet-500/20 transition-all duration-150 cursor-pointer"
+            title="Open productivity dashboard"
+          >
+            <span>📊</span>
+            <span>Stats</span>
+          </button>
+        </div>
       </div>
     </div>
   );

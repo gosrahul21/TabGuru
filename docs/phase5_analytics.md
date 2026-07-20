@@ -13,6 +13,7 @@ To support historical data and complex analytical queries without bloating `chro
 #### Database Schema: `TabGuruDB`
 * **`purposes` Store:**
   * Key path: `id` (autoIncrement)
+  
   * Index on: `date` (YYYY-MM-DD), `status`, `category`
   * Values:
     ```typescript
