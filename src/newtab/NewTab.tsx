@@ -5,6 +5,8 @@ import PurposeInput from './components/PurposeInput';
 import DurationChips from './components/DurationChips';
 import SuggestionChips from './components/SuggestionChips';
 import SearchInput from './components/SearchInput';
+import ExcludedDomains from './components/ExcludedDomains';
+import ShortcutsList from './components/ShortcutsList';
 
 // Ambient floating orbs for background
 function Orbs() {
@@ -29,13 +31,21 @@ export default function NewTab() {
     return isNaN(n) ? undefined : n;
   })();
 
+  // Hostname of the destination — used as fallback purpose label when intent is skipped
+  const redirectHostname = (() => {
+    if (!redirectParam) return '';
+    try { return new URL(redirectParam).hostname.replace(/^www\./, ''); } catch { return ''; }
+  })();
+
   const [purpose, setPurpose] = useState('');
   const [duration, setDuration] = useState<number>(15);
   // Pre-fill destination if we have a redirect param
   const [destination, setDestination] = useState(redirectParam ?? '');
   const [suggestions, setSuggestions] = useState<RecentPurpose[]>([]);
+  const [shortcuts, setShortcuts] = useState<import('../types').Shortcut[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
 
   // Parent tab linking state.
   // Both right-click and + button default to LINKED (true).
@@ -44,11 +54,22 @@ export default function NewTab() {
   const [rawOpenerTabId, setRawOpenerTabId] = useState<number | undefined>(explicitOpenerFromUrl);
   const [parentPurposeText, setParentPurposeText] = useState<string | null>(null);
 
-  // Load suggestions from history
   useEffect(() => {
     getRecentPurposes().then((recent) => {
-      if (recent.length > 0) setSuggestions(recent.slice(0, 5));
+      if (recent.length > 0) setSuggestions(recent.slice(0, 3));
     });
+  }, []);
+
+  // Load shortcuts
+  useEffect(() => {
+    chrome.runtime
+      .sendMessage({ type: 'GET_SHORTCUTS' })
+      .then((res) => {
+        if (res?.success && Array.isArray(res.shortcuts)) {
+          setShortcuts(res.shortcuts);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Fetch the parent tab's purpose text to display in the chip / badge
@@ -73,10 +94,6 @@ export default function NewTab() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(async () => {
-    if (!purpose.trim()) {
-      setError('Please describe your purpose for opening this tab.');
-      return;
-    }
     setError('');
     setIsSubmitting(true);
 
@@ -88,10 +105,17 @@ export default function NewTab() {
       // openerTabId is fully controlled by the parent-link UI toggle
       const openerTabId = linkedToParent ? rawOpenerTabId : undefined;
 
+      // Purpose is optional — fall back in order of specificity:
+      // 1. User-typed intent  2. Subtask label from parent  3. Destination hostname  4. Generic
+      const resolvedPurpose = purpose.trim()
+        || (linkedToParent && parentPurposeText ? `Subtask of: ${parentPurposeText}` : '')
+        || (redirectHostname ? `Browsing ${redirectHostname}` : '')
+        || 'Quick browse';
+
       const now = Date.now();
       const newPurpose: TabPurpose = {
         tabId,
-        purpose: purpose.trim(),
+        purpose: resolvedPurpose,
         durationMinutes: duration,
         startTime: now,
         endTime: now + duration * 60_000, // kept for reference
@@ -128,21 +152,62 @@ export default function NewTab() {
       setError('Something went wrong. Please try again.');
       setIsSubmitting(false);
     }
-  }, [purpose, duration, destination, linkedToParent, rawOpenerTabId]);
+  }, [purpose, duration, destination, linkedToParent, rawOpenerTabId, parentPurposeText, redirectHostname]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) handleSubmit();
   };
 
+  const handleSaveShortcut = () => {
+    const enteredPurpose = purpose.trim();
+    if (!enteredPurpose) {
+      setError('Please enter an intention to save it as a shortcut.');
+      return;
+    }
+
+    const newShortcut: import('../types').Shortcut = {
+      id: Date.now().toString(),
+      name: enteredPurpose,
+      purpose: enteredPurpose,
+      destinationUrl: destination.trim() || undefined,
+      durationMinutes: duration,
+    };
+
+    const updated = [...shortcuts, newShortcut];
+    chrome.runtime.sendMessage({
+      type: 'SET_SHORTCUTS',
+      payload: { shortcuts: updated } as any,
+    }).then(() => setShortcuts(updated)).catch(() => {});
+  };
+
+  const handleRemoveShortcut = (id: string) => {
+    const updated = shortcuts.filter(s => s.id !== id);
+    chrome.runtime.sendMessage({
+      type: 'SET_SHORTCUTS',
+      payload: { shortcuts: updated } as any,
+    }).then(() => setShortcuts(updated)).catch(() => {});
+  };
+
+  const isTypingDestination = destination.trim().length > 0;
+  const isTypingPurpose = purpose.trim().length > 0;
+  
+  const matchingShortcuts = (isTypingDestination || isTypingPurpose) 
+    ? shortcuts.filter(s => {
+        const destMatch = isTypingDestination && s.destinationUrl?.toLowerCase().includes(destination.toLowerCase());
+        const purposeMatch = isTypingPurpose && s.purpose.toLowerCase().includes(purpose.toLowerCase());
+        return destMatch || purposeMatch;
+      }).slice(0, 3)
+    : [];
+
   return (
     <div
-      className="relative min-h-screen w-full flex items-center justify-center bg-[#0a0a12] font-outfit overflow-hidden"
+      className="relative h-screen w-full bg-[#0a0a12] font-outfit overflow-y-auto"
       onKeyDown={handleKeyDown}
     >
       <Orbs />
 
       {/* Main card */}
-      <div className="relative z-10 w-full max-w-xl mx-4">
+      <div className="relative z-10 w-full max-w-xl mx-auto px-4 py-10">
         {/* Logo & Headline */}
         <div className="mb-8 select-none flex flex-col items-center">
           <div className="flex flex-row items-center gap-4">
@@ -198,16 +263,34 @@ export default function NewTab() {
           <div>
             <label className="block text-slate-200 text-base font-semibold mb-2">
               Why are you opening this tab?
+              <span className="ml-2 text-slate-500 text-sm font-normal normal-case tracking-normal">(optional)</span>
             </label>
             <PurposeInput
               value={purpose}
               onChange={setPurpose}
-              hasError={!!error && !purpose.trim()}
+              hasError={false}
             />
             {error && (
               <p className="mt-1.5 text-xs text-red-400 font-inter">{error}</p>
             )}
+            <p className="mt-1.5 text-[11px] text-slate-600 font-inter">
+              Skip to auto-label as{' '}
+              <span className="text-slate-500 font-mono">
+                &quot;{redirectHostname ? `Browsing ${redirectHostname}` : (linkedToParent && parentPurposeText ? `Subtask of: ${parentPurposeText}` : 'Quick browse')}&quot;
+              </span>
+              {' '}— editable later.
+            </p>
           </div>
+
+          <ShortcutsList
+            shortcuts={shortcuts}
+            onSelect={(s) => {
+              setPurpose(s.purpose);
+              if (s.destinationUrl) setDestination(s.destinationUrl);
+              setDuration(s.durationMinutes);
+            }}
+            onRemove={handleRemoveShortcut}
+          />
 
           {/* Suggestions (only shown once history builds up) */}
           {suggestions.length > 0 && (
@@ -273,45 +356,129 @@ export default function NewTab() {
                 onChange={setDestination}
                 onSubmit={handleSubmit}
               />
+              {/* Contextual matching shortcuts */}
+              {matchingShortcuts.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[10px] text-slate-500 font-inter mb-1.5 uppercase tracking-widest font-semibold">
+                    Matching Shortcuts
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {matchingShortcuts.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setPurpose(s.purpose);
+                          if (s.destinationUrl) setDestination(s.destinationUrl);
+                          setDuration(s.durationMinutes);
+                        }}
+                        className="
+                          flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-left
+                          bg-violet-500/10 border border-violet-500/20 text-violet-300
+                          hover:bg-violet-500/20 hover:text-violet-200 hover:border-violet-500/40
+                          transition-all duration-150 text-xs font-medium
+                        "
+                      >
+                        ⚡ {s.name}
+                        {s.destinationUrl && (
+                          <span className="text-[10px] text-violet-400/60 font-normal">
+                            ({new URL(s.destinationUrl.startsWith('http') ? s.destinationUrl : `https://${s.destinationUrl}`).hostname.replace(/^www\./, '')})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Continue button */}
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide
-              bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600
-              hover:from-indigo-400 hover:via-violet-400 hover:to-purple-500
-              text-white shadow-[0_4px_24px_rgba(139,92,246,0.4)]
-              hover:shadow-[0_4px_32px_rgba(139,92,246,0.6)]
-              transform hover:scale-[1.01] active:scale-[0.99]
-              transition-all duration-200
-              disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none
-              focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-transparent"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Starting session…
-              </span>
-            ) : (
-              'Continue →'
-            )}
-          </button>
+          {/* Continue & Save actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="flex-1 py-3.5 rounded-xl font-semibold text-sm tracking-wide
+                bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600
+                hover:from-indigo-400 hover:via-violet-400 hover:to-purple-500
+                text-white shadow-[0_4px_24px_rgba(139,92,246,0.4)]
+                hover:shadow-[0_4px_32px_rgba(139,92,246,0.6)]
+                transform hover:scale-[1.01] active:scale-[0.99]
+                transition-all duration-200
+                disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none
+                focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-transparent"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Starting session…
+                </span>
+              ) : (
+                'Continue →'
+              )}
+            </button>
+            <button
+              onClick={handleSaveShortcut}
+              title="Save current form as a shortcut"
+              className="px-4 py-3.5 rounded-xl font-semibold text-sm tracking-wide
+                bg-white/5 border border-white/10 text-slate-300
+                hover:bg-violet-500/15 hover:border-violet-500/30 hover:text-violet-300
+                transform hover:scale-[1.02] active:scale-[0.98]
+                transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            >
+              ⭐ Save
+            </button>
+          </div>
 
           <p className="text-center text-xs text-slate-600 font-inter">
-            Every tab deserves a purpose. No skipping.
+            Purpose is optional — you can always rename it later.
           </p>
+
+          {/* ── Settings section ── */}
+          <div className="border-t border-white/[0.06] pt-3">
+            <button
+              type="button"
+              onClick={() => setShowSettings((v) => !v)}
+              className="w-full flex items-center justify-between text-[11px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer select-none"
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="text-base leading-none">⚙️</span>
+                Settings
+              </span>
+              <span className={`transition-transform duration-200 ${showSettings ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+
+            {showSettings && (
+              <div className="mt-3">
+                <ExcludedDomains />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
-        <p className="text-center mt-5 text-slate-700 text-xs font-inter">
-          TabGuru — Every tab starts with a purpose.
-        </p>
+        <div className="flex items-center justify-between mt-5 px-1">
+          <p className="text-slate-700 text-xs font-inter">
+            TabGuru — Every tab starts with a purpose.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const dashboardUrl = chrome.runtime.getURL('src/dashboard/index.html');
+              window.open(dashboardUrl, '_blank');
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+              text-slate-500 hover:text-violet-300 hover:bg-violet-500/10 border border-transparent
+              hover:border-violet-500/20 transition-all duration-150 cursor-pointer"
+            title="Open productivity dashboard"
+          >
+            <span>📊</span>
+            <span>Stats</span>
+          </button>
+        </div>
       </div>
     </div>
   );

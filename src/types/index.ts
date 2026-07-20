@@ -22,6 +22,47 @@ export interface TabPurpose {
 // Map of tabId (as string key) → TabPurpose
 export type ActivePurposes = Record<string, TabPurpose>;
 
+// ─── Excluded Domain ─────────────────────────────────────────────────────────
+
+export interface ExcludedDomain {
+  domain: string;        // e.g. "localhost", "staging.company.com", "*.corp.com"
+  intention?: string;    // Optional saved purpose shown when this domain is visited
+}
+
+// ─── Shortcut ────────────────────────────────────────────────────────────────
+
+export interface Shortcut {
+  id: string; // unique identifier
+  name: string; // e.g. "Check Emails"
+  purpose: string;
+  destinationUrl?: string;
+  durationMinutes: number;
+}
+
+// ─── Analytics Types (Phase 5) ──────────────────────────────────────────────
+
+export interface HistoricalPurpose {
+  id?: number;
+  date: string;                  // YYYY-MM-DD
+  purpose: string;
+  startTime: number;             // Epoch ms
+  endTime: number;               // Epoch ms
+  timeSpentMs: number;
+  durationMinutesAllocated: number;
+  status: 'completed' | 'abandoned';
+  category: string;              // e.g. Programming, Shopping, Research
+  domain?: string;               // destination hostname
+}
+
+export interface DriftRecord {
+  id?: number;
+  date: string;                  // YYYY-MM-DD
+  timestamp: number;             // Epoch ms
+  domain: string;                // hostname where drift occurred
+  purposeText: string;           // active purpose at the time
+  userAction: 'go_back' | 'continue' | 'update_purpose';
+}
+
 // ─── Storage Keys ────────────────────────────────────────────────────────────
 
 export const STORAGE_KEY_ACTIVE = 'active_purposes' as const;
@@ -39,7 +80,16 @@ export type MessageType =
   | 'BROADCAST_REFRESH'
   | 'ACTIVATE_TAB'
   | 'UPDATE_PURPOSE'
-  | 'DETACH_PARENT';
+  | 'DETACH_PARENT'
+  | 'GET_EXCLUDED_DOMAINS'
+  | 'SET_EXCLUDED_DOMAINS'
+  | 'GET_SHORTCUTS'
+  | 'SET_SHORTCUTS'
+  | 'LOG_DRIFT_EVENT'
+  | 'GET_DAILY_STATS'
+  | 'GET_WEEKLY_STATS'
+  | 'GET_HISTORY'
+  | 'GET_DRIFT_HOTSPOTS';
 
 export interface ExtensionMessage {
   type: MessageType;
@@ -67,5 +117,7 @@ export interface ExtensionResponse {
   success: boolean;
   data?: TabPurpose | null;
   activeChildren?: TabPurpose[];
+  excludedDomains?: ExcludedDomain[];
+  shortcuts?: Shortcut[];
   error?: string;
 }

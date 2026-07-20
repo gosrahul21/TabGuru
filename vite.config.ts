@@ -21,7 +21,12 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
-      // Ensure content scripts with ?inline imports bundle correctly
+      input: {
+        // Dashboard standalone page
+        dashboard: 'src/dashboard/index.html',
+        // Extension icon popup
+        popup: 'src/popup/index.html',
+      },
       output: {
         // Keep content script as a single file (no chunking)
         manualChunks: undefined,

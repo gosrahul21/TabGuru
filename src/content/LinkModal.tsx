@@ -20,7 +20,6 @@ export default function LinkModal({ destinationUrl, openerTabId, onClose }: Prop
   const [purpose, setPurpose] = useState('');
   const [duration, setDuration] = useState<number>(15);
   const [isOpening, setIsOpening] = useState(false);
-  const [error, setError] = useState('');
   const hostname = getHostname(destinationUrl);
 
   // Close on Escape
@@ -33,19 +32,17 @@ export default function LinkModal({ destinationUrl, openerTabId, onClose }: Prop
   }, [onClose]);
 
   const handleOpen = useCallback(async () => {
-    if (!purpose.trim()) {
-      setError('Please describe why you are opening this tab.');
-      return;
-    }
-    setError('');
     setIsOpening(true);
+
+    // Purpose is optional — fall back to a contextual label
+    const resolvedPurpose = purpose.trim() || `Browsing ${hostname}`;
 
     const msg: ExtensionMessage = {
       type: 'OPEN_TAB_WITH_PURPOSE',
       tabId: openerTabId,
       payload: {
         url: destinationUrl,
-        purpose: purpose.trim(),
+        purpose: resolvedPurpose,
         durationMinutes: duration,
       } as never,
     };
@@ -54,10 +51,9 @@ export default function LinkModal({ destinationUrl, openerTabId, onClose }: Prop
       await chrome.runtime.sendMessage(msg);
       onClose();
     } catch {
-      setError('Could not open tab. Please try again.');
       setIsOpening(false);
     }
-  }, [purpose, duration, destinationUrl, openerTabId, onClose]);
+  }, [purpose, hostname, duration, destinationUrl, openerTabId, onClose]);
 
   return (
     /* Backdrop */
@@ -112,6 +108,7 @@ export default function LinkModal({ destinationUrl, openerTabId, onClose }: Prop
         <div>
           <label className="block text-xs text-slate-400 font-semibold mb-1.5 uppercase tracking-widest">
             Why are you visiting this?
+            <span className="ml-1 text-slate-600 normal-case tracking-normal font-normal">(optional)</span>
           </label>
           <textarea
             value={purpose}
@@ -125,20 +122,17 @@ export default function LinkModal({ destinationUrl, openerTabId, onClose }: Prop
             rows={2}
             autoFocus
             placeholder={`e.g. "Learn about ${hostname}", "Reference docs"…`}
-            className={`
+            className="
               w-full resize-none rounded-xl px-3 py-2.5 text-sm
-              bg-white/5 border text-slate-100 placeholder-slate-600
+              bg-white/5 border border-white/10 text-slate-100 placeholder-slate-600
+              hover:border-white/20 focus:border-violet-500/60
               outline-none transition-all duration-200
               focus:shadow-[0_0_0_2px_rgba(139,92,246,0.45)]
-              ${error
-                ? 'border-red-500/60'
-                : 'border-white/10 hover:border-white/20 focus:border-violet-500/60'
-              }
-            `}
+            "
           />
-          {error && (
-            <p className="mt-1 text-[11px] text-red-400">{error}</p>
-          )}
+          <p className="mt-1 text-[10px] text-slate-600">
+            Skip to open with auto-label “Browsing {hostname}”
+          </p>
         </div>
 
         {/* Duration chips */}

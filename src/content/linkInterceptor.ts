@@ -36,8 +36,46 @@ function findAnchor(target: EventTarget | null): HTMLAnchorElement | null {
   return el?.tagName === 'A' ? (el as HTMLAnchorElement) : null;
 }
 
+// ─── Excluded domains cache (refreshed every 5 seconds) ───────────────────────
+
+import type { ExcludedDomain } from '../types';
+
+let _excludedDomainsCache: ExcludedDomain[] = [];
+let _cacheTimestamp = 0;
+const CACHE_TTL_MS = 5_000;
+
+async function getExcludedDomainsCache(): Promise<ExcludedDomain[]> {
+  const now = Date.now();
+  if (now - _cacheTimestamp < CACHE_TTL_MS) return _excludedDomainsCache;
+  try {
+    const res = await chrome.runtime.sendMessage({ type: 'GET_EXCLUDED_DOMAINS' });
+    if (res?.success && Array.isArray(res.excludedDomains)) {
+      _excludedDomainsCache = res.excludedDomains;
+      _cacheTimestamp = now;
+    }
+  } catch { /* extension context not ready */ }
+  return _excludedDomainsCache;
+}
+
+function matchesDomain(hostname: string, d: string): boolean {
+  if (d.startsWith('*.')) {
+    const base = d.slice(2);
+    return hostname === base || hostname.endsWith(`.${base}`);
+  }
+  return hostname === d || hostname === `www.${d}` || `www.${hostname}` === d;
+}
+
+function isHostnameExcluded(hostname: string, domains: ExcludedDomain[]): boolean {
+  return domains.some(({ domain: d }) => matchesDomain(hostname, d));
+}
+
+function getSavedIntention(hostname: string, domains: ExcludedDomain[]): string | null {
+  const match = domains.find(({ domain: d }) => matchesDomain(hostname, d));
+  return match?.intention?.trim() || null;
+}
+
 export function initLinkInterceptor(openModal: OpenLinkModalFn): () => void {
-  const handleClick = (event: MouseEvent) => {
+  const handleClick = async (event: MouseEvent) => {
     const anchor = findAnchor(event.target);
     if (!anchor) return;
 
@@ -48,6 +86,33 @@ export function initLinkInterceptor(openModal: OpenLinkModalFn): () => void {
 
     // Only intercept navigations that would open a new tab
     if (!wouldOpenNewTab(event, anchor)) return;
+
+    // Check if destination is in excluded domains
+    // If excluded: open tab silently with an auto-purpose (no modal) so it's still tracked as a subtask
+    try {
+      const hostname = new URL(href).hostname.replace(/^www\./, '');
+      const excluded = await getExcludedDomainsCache();
+      if (isHostnameExcluded(hostname, excluded)) {
+        // Prevent the browser from opening the tab (we'll create it with a purpose record)
+        event.preventDefault();
+        event.stopPropagation();
+        // Look up the saved intention for this domain (falls back to hostname auto-label)
+        const savedIntention = getSavedIntention(hostname, excluded);
+        // Fire-and-forget — silently create tracked tab
+        chrome.runtime.sendMessage({
+          type: 'OPEN_TAB_WITH_PURPOSE',
+          payload: {
+            url: href,
+            purpose: savedIntention || `Browsing ${hostname}`,
+            durationMinutes: 15,
+          } as never,
+        }).catch(() => {
+          // Extension context gone — fall back to native open
+          window.open(href, '_blank');
+        });
+        return;
+      }
+    } catch { /* malformed URL — proceed with interception */ }
 
     // Block the default browser navigation
     event.preventDefault();
