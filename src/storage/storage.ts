@@ -5,6 +5,8 @@ const KEY_RECENT  = 'recent_purposes';
 const KEY_PENDING = 'pending_purposes'; // short-lived, TTL 30s
 const KEY_EXCLUDED_DOMAINS = 'excluded_domains';
 const KEY_SHORTCUTS = 'shortcuts';
+const KEY_INSTALL_TIME = 'installTime';
+const KEY_LICENSE_KEY = 'license_key';
 
 // Default domains where TabGuru should never intercept
 const DEFAULT_EXCLUDED_DOMAINS: ExcludedDomain[] = [{ domain: 'localhost' }];
@@ -356,4 +358,24 @@ export async function getShortcuts(): Promise<Shortcut[]> {
  */
 export async function setShortcuts(shortcuts: Shortcut[]): Promise<void> {
   await chrome.storage.local.set({ [KEY_SHORTCUTS]: shortcuts });
+}
+
+// ─── Trial and License ───────────────────────────────────────────────────────
+
+export async function getInstallTime(): Promise<number | null> {
+  const result = await chrome.storage.local.get(KEY_INSTALL_TIME);
+  return (result[KEY_INSTALL_TIME] as number) ?? null;
+}
+
+export async function setInstallTime(timestamp: number): Promise<void> {
+  await chrome.storage.local.set({ [KEY_INSTALL_TIME]: timestamp });
+}
+
+export async function getLicenseKey(): Promise<string | null> {
+  const result = await chrome.storage.local.get(KEY_LICENSE_KEY);
+  return (result[KEY_LICENSE_KEY] as string) ?? null;
+}
+
+export async function setLicenseKey(key: string): Promise<void> {
+  await chrome.storage.local.set({ [KEY_LICENSE_KEY]: key });
 }

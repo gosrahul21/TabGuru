@@ -19,7 +19,12 @@ import {
   getIntentionForUrl,
   getShortcuts,
   setShortcuts,
+  getInstallTime,
+  setInstallTime,
+  getLicenseKey,
+  setLicenseKey,
 } from '../storage/storage';
+import { DODO_API_BASE, WELCOME_ONBOARDING_URL, PAYWALL_URL, UNINSTALL_URL } from '../config';
 import type { ExtensionMessage, ExtensionResponse } from '../types';
 import {
   logCompletedPurpose,
@@ -31,6 +36,43 @@ import {
   toDateString,
 } from '../db/indexedDb';
 import { classifyPurpose } from '../db/classifier';
+
+// ─── Trial and License Logic ───────────────────────────────────────────────────
+
+const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+async function isPremiumOrTrialActive(): Promise<boolean> {
+  const licenseKey = await getLicenseKey();
+  if (licenseKey && licenseKey.length > 4) {
+    return true; // Assume valid if exists (verified during activation)
+  }
+
+  const installTime = await getInstallTime();
+  if (!installTime) {
+    // If somehow install time is missing, set it now to give them a trial
+    await setInstallTime(Date.now());
+    return true;
+  }
+
+  if (Date.now() - installTime < TRIAL_DURATION_MS) {
+    return true; // Still in trial
+  }
+
+  return false; // Trial expired and no license
+}
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
+    await setInstallTime(Date.now());
+    if (WELCOME_ONBOARDING_URL) {
+      chrome.tabs.create({ url: WELCOME_ONBOARDING_URL });
+    }
+  }
+
+  if (UNINSTALL_URL) {
+    chrome.runtime.setUninstallURL(UNINSTALL_URL);
+  }
+});
 
 // ─── Tab Lifecycle ────────────────────────────────────────────────────────────
 
@@ -103,6 +145,7 @@ const SKIP_PATTERNS = [
   /^about:/,
   /^javascript:/,
   /^data:/,
+  /^https?:\/\/(test\.)?checkout\.dodopayments\.com/,
 ];
 
 chrome.tabs.onCreated.addListener(async (tab) => {
@@ -140,6 +183,13 @@ chrome.tabs.onCreated.addListener(async (tab) => {
         createdAt: Date.now(),
       });
     } catch { /* malformed URL — skip tracking */ }
+    return;
+  }
+
+  // Trial Check
+  const hasAccess = await isPremiumOrTrialActive();
+  if (!hasAccess) {
+    chrome.tabs.update(tab.id, { url: PAYWALL_URL });
     return;
   }
 
@@ -200,6 +250,13 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const hasPending = await hasPendingPurposeForUrl(url);
     if (hasPending) return;
 
+    // Trial Check
+    const hasAccess = await isPremiumOrTrialActive();
+    if (!hasAccess) {
+      chrome.tabs.update(tabId, { url: PAYWALL_URL });
+      return;
+    }
+
     // Redirect to the purpose page, carrying the URL the user attempted to search/visit
     const purposePageWithRedirect = `${PURPOSE_PAGE}?redirect=${encodeURIComponent(url)}`;
     chrome.tabs.update(tabId, { url: purposePageWithRedirect });
@@ -250,12 +307,33 @@ chrome.runtime.onMessage.addListener(
       'BROADCAST_REFRESH'
     ];
 
-    if (!tabId && !globalMessages.includes(message.type)) {
+    if (!tabId && !globalMessages.includes(message.type) && message.type !== 'ACTIVATE_LICENSE') {
       sendResponse({ success: false, error: 'No tabId found' });
       return false;
     }
 
     switch (message.type) {
+      // ── ACTIVATE_LICENSE ───────────────────────────────────────────────────
+      case 'ACTIVATE_LICENSE': {
+        const msg = message as Extract<ExtensionMessage, { type: 'ACTIVATE_LICENSE' }>;
+        const DODO_ACTIVATE_URL = `${DODO_API_BASE}/licenses/activate`;
+        
+        fetch(DODO_ACTIVATE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ license_key: msg.licenseKey })
+        })
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Invalid license key');
+          await setLicenseKey(msg.licenseKey);
+          sendResponse({ success: true });
+        })
+        .catch(err => {
+          sendResponse({ success: false, error: err.message || 'Invalid license key.' });
+        });
+        
+        return true;
+      }
       // ── GET_PURPOSE ────────────────────────────────────────────────────────
       // First checks active purposes; if not found, checks pending_purposes
       // (for tabs that were opened via link interception).
@@ -263,7 +341,7 @@ chrome.runtime.onMessage.addListener(
         (async () => {
           try {
             // Try active first
-            let data = await getPurpose(tabId);
+            let data = await getPurpose(tabId!);
 
             // If no active purpose, try to claim a pending one using the tab's URL
             if (!data && sender.tab?.url) {
@@ -274,13 +352,13 @@ chrome.runtime.onMessage.addListener(
                   openerTabId = t.openerTabId;
                 } catch { /* ignore */ }
               }
-              data = await consumePendingPurpose(tabId, sender.tab.url, openerTabId);
+              data = await consumePendingPurpose(tabId!, sender.tab.url, openerTabId);
               if (data) {
                 await broadcastMessage({ type: 'REFRESH_STATE' });
               }
             }
 
-            const activeChildren = await getActiveChildren(tabId);
+            const activeChildren = await getActiveChildren(tabId!);
             sendResponse({ success: true, data, activeChildren });
           } catch (err) {
             sendResponse({ success: false, error: String(err) });
@@ -292,18 +370,18 @@ chrome.runtime.onMessage.addListener(
       // ── MARK_COMPLETE ──────────────────────────────────────────────────────
       case 'MARK_COMPLETE': {
         const shouldCloseChildren = message.payload?.closeChildren ?? false;
-        updatePurposeStatus(tabId, 'completed')
+        updatePurposeStatus(tabId!, 'completed')
           .then(async () => {
             // Recursively close entire descendant tree if requested
             if (shouldCloseChildren) {
-              const descendants = await getAllDescendants(tabId);
+              const descendants = await getAllDescendants(tabId!);
               for (const desc of descendants) {
                 await updatePurposeStatus(desc.tabId, 'completed').catch(() => {});
                 await chrome.tabs.remove(desc.tabId).catch(() => {});
               }
             }
             try {
-              await chrome.tabs.remove(tabId);
+              await chrome.tabs.remove(tabId!);
             } catch { /* ignore if already closed */ }
           })
           .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
@@ -315,7 +393,7 @@ chrome.runtime.onMessage.addListener(
       // ── EXTEND_TIMER ───────────────────────────────────────────────────────
       // ── DETACH_PARENT ─────────────────────────────────────────────────
       case 'DETACH_PARENT': {
-        detachFromParent(tabId)
+        detachFromParent(tabId!)
           .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
@@ -326,7 +404,7 @@ chrome.runtime.onMessage.addListener(
       case 'UPDATE_PURPOSE': {
         const newText = message.payload?.purpose?.trim();
         if (!newText) { sendResponse({ success: false, error: 'Empty purpose' }); return false; }
-        updatePurposeText(tabId, newText)
+        updatePurposeText(tabId!, newText)
           .then(() => broadcastMessage({ type: 'REFRESH_STATE' }))
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
@@ -335,8 +413,8 @@ chrome.runtime.onMessage.addListener(
 
       case 'EXTEND_TIMER': {
         const extra = message.payload?.extraMinutes ?? 5;
-        extendPurpose(tabId, extra)
-          .then(() => getPurpose(tabId))
+        extendPurpose(tabId!, extra)
+          .then(() => getPurpose(tabId!))
           .then((data) => sendResponse({ success: true, data }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
         return true;
@@ -344,15 +422,15 @@ chrome.runtime.onMessage.addListener(
 
       // ── TOGGLE_PAUSE ───────────────────────────────────────────────────────
       case 'TOGGLE_PAUSE': {
-        getPurpose(tabId)
+        getPurpose(tabId!)
           .then(async (purpose) => {
             if (!purpose) return null;
             if (purpose.lastActivatedAt === null) {
-              await resumePurpose(tabId);
+              await resumePurpose(tabId!);
             } else {
-              await pausePurpose(tabId);
+              await pausePurpose(tabId!);
             }
-            return getPurpose(tabId);
+            return getPurpose(tabId!);
           })
           .then((data) => sendResponse({ success: true, data }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));
@@ -379,7 +457,7 @@ chrome.runtime.onMessage.addListener(
           createdAt: Date.now(),
         })
           .then(() =>
-            chrome.tabs.create({ url, openerTabId: tabId })
+            chrome.tabs.create({ url, openerTabId: tabId! })
           )
           .then(() => sendResponse({ success: true }))
           .catch((err) => sendResponse({ success: false, error: String(err) }));

@@ -26,6 +26,10 @@ export default defineConfig({
         dashboard: 'src/dashboard/index.html',
         // Extension icon popup
         popup: 'src/popup/index.html',
+        // Welcome onboarding page
+        welcome: 'src/welcome/index.html',
+        // Paywall page
+        paywall: 'src/paywall/index.html',
       },
       output: {
         // Keep content script as a single file (no chunking)

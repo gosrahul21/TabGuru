@@ -89,19 +89,22 @@ export type MessageType =
   | 'GET_DAILY_STATS'
   | 'GET_WEEKLY_STATS'
   | 'GET_HISTORY'
-  | 'GET_DRIFT_HOTSPOTS';
+  | 'GET_DRIFT_HOTSPOTS'
+  | 'ACTIVATE_LICENSE';
 
-export interface ExtensionMessage {
-  type: MessageType;
-  tabId?: number;
-  payload?: Partial<TabPurpose> & {
-    extraMinutes?: number;
-    url?: string;            // for OPEN_TAB_WITH_PURPOSE
-    durationMinutes?: number;
-    targetTabId?: number;    // for ACTIVATE_TAB
-    closeChildren?: boolean; // for MARK_COMPLETE — cascade close child tabs
-  };
-}
+export type ExtensionMessage =
+  | {
+      type: Exclude<MessageType, 'ACTIVATE_LICENSE'>;
+      tabId?: number;
+      payload?: Partial<TabPurpose> & {
+        extraMinutes?: number;
+        url?: string;            // for OPEN_TAB_WITH_PURPOSE
+        durationMinutes?: number;
+        targetTabId?: number;    // for ACTIVATE_TAB
+        closeChildren?: boolean; // for MARK_COMPLETE — cascade close child tabs
+      };
+    }
+  | { type: 'ACTIVATE_LICENSE'; licenseKey: string; tabId?: number };
 
 // ─── Pending Purpose (stored briefly for link-opened tabs) ───────────────────
 // When a user clicks a link and enters a purpose, this is stored temporarily.
