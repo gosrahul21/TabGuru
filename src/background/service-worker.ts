@@ -105,9 +105,9 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     try { domain = existing.destinationUrl ? new URL(existing.destinationUrl).hostname.replace(/^www\./, '') : ''; } catch { /* ignore */ }
     const category = classifyPurpose(existing.purpose, domain);
     
-    // If it was already marked completed (via MARK_COMPLETE), log as completed. 
-    // Otherwise, the user just closed the tab, so it's abandoned.
-    const finalStatus = existing.status === 'completed' ? 'completed' : 'abandoned';
+    // Closing a tab is treated as completing the session.
+    // The only distinction is whether it was explicitly completed via MARK_COMPLETE first.
+    const finalStatus: 'completed' = 'completed';
     
     logCompletedPurpose({
       date: toDateString(existing.startTime),

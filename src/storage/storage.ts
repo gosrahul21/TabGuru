@@ -2,6 +2,7 @@ import type { TabPurpose, ActivePurposes, PendingPurpose, ExcludedDomain, Shortc
 
 const KEY_ACTIVE  = 'active_purposes';
 const KEY_RECENT  = 'recent_purposes';
+const KEY_RECENT_DESTINATIONS = 'recent_destinations';
 const KEY_PENDING = 'pending_purposes'; // short-lived, TTL 30s
 const KEY_EXCLUDED_DOMAINS = 'excluded_domains';
 const KEY_SHORTCUTS = 'shortcuts';
@@ -27,6 +28,10 @@ export async function savePurpose(purpose: TabPurpose): Promise<void> {
 
   if (purpose.purpose.trim()) {
     await addRecentPurpose(purpose.purpose.trim(), purpose.destinationUrl);
+  }
+  
+  if (purpose.destinationUrl?.trim()) {
+    await addRecentDestination(purpose.destinationUrl.trim());
   }
 }
 
@@ -275,6 +280,34 @@ async function addRecentPurpose(purpose: string, url?: string): Promise<void> {
   recent.unshift({ purpose, url });
   recent = recent.slice(0, 10);
   await chrome.storage.local.set({ [KEY_RECENT]: recent });
+}
+
+export async function getRecentDestinations(): Promise<string[]> {
+  const result = await chrome.storage.local.get(KEY_RECENT_DESTINATIONS);
+  return (result[KEY_RECENT_DESTINATIONS] as string[]) || [];
+}
+
+async function addRecentDestination(url: string): Promise<void> {
+  const result = await chrome.storage.local.get(KEY_RECENT_DESTINATIONS);
+  let recent = (result[KEY_RECENT_DESTINATIONS] as string[]) || [];
+  
+  // Extract hostname if possible to keep suggestions clean
+  let cleanDomain = url;
+  try {
+    const isFullUrl = url.startsWith('http://') || url.startsWith('https://');
+    const parseUrl = isFullUrl ? url : `https://${url}`;
+    cleanDomain = new URL(parseUrl).hostname.replace(/^www\./, '');
+  } catch (e) {
+    // Keep raw string if parsing fails
+  }
+  
+  // filter out duplicates
+  recent = recent.filter((d) => d !== cleanDomain);
+  recent.unshift(cleanDomain);
+  
+  // Keep up to 50 recent domains
+  recent = recent.slice(0, 50);
+  await chrome.storage.local.set({ [KEY_RECENT_DESTINATIONS]: recent });
 }
 
 // ─── Excluded Domains ─────────────────────────────────────────────────────────
