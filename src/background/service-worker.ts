@@ -105,9 +105,19 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     try { domain = existing.destinationUrl ? new URL(existing.destinationUrl).hostname.replace(/^www\./, '') : ''; } catch { /* ignore */ }
     const category = classifyPurpose(existing.purpose, domain);
     
-    // Closing a tab is treated as completing the session.
-    // The only distinction is whether it was explicitly completed via MARK_COMPLETE first.
-    const finalStatus: 'completed' = 'completed';
+    // Time-based auto-classification:
+    // If the tab was already explicitly marked complete via MARK_COMPLETE → completed.
+    // Otherwise, infer from time spent vs. allocated time:
+    //   < 20% of allocated time spent → abandoned (closed too quickly, likely distracted or wrong tab)
+    //   ≥ 20% spent → completed (user engaged meaningfully with the task)
+    const allocatedMs = existing.durationMinutes * 60_000;
+    const completionRatio = allocatedMs > 0 ? timeSpentMs / allocatedMs : 1;
+    const ABANDONMENT_THRESHOLD = 0.20; // 20%
+    const finalStatus = existing.status === 'completed'
+      ? 'completed'
+      : completionRatio < ABANDONMENT_THRESHOLD
+        ? 'abandoned'
+        : 'completed';
     
     logCompletedPurpose({
       date: toDateString(existing.startTime),
