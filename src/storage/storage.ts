@@ -310,6 +310,13 @@ async function addRecentDestination(url: string): Promise<void> {
   await chrome.storage.local.set({ [KEY_RECENT_DESTINATIONS]: recent });
 }
 
+export async function removeRecentDestination(domain: string): Promise<void> {
+  const result = await chrome.storage.local.get(KEY_RECENT_DESTINATIONS);
+  let recent = (result[KEY_RECENT_DESTINATIONS] as string[]) || [];
+  recent = recent.filter((d) => d !== domain);
+  await chrome.storage.local.set({ [KEY_RECENT_DESTINATIONS]: recent });
+}
+
 // ─── Excluded Domains ─────────────────────────────────────────────────────────
 
 /**

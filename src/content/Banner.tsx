@@ -35,6 +35,72 @@ function useCountdown(purpose: TabPurpose | null) {
   return { mins, secs, isUrgent, isExpired, isPaused, msLeft };
 }
 
+// ─── Theme Hook ──────────────────────────────────────────────────────────────
+
+function useBannerTheme() {
+  const [theme, setTheme] = useState<'white' | 'dark'>('white');
+  useEffect(() => {
+    chrome.storage.local.get('tabguru-theme-mode', (res) => {
+      if (res['tabguru-theme-mode']) setTheme(res['tabguru-theme-mode'] === 'dark' ? 'dark' : 'white');
+    });
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes['tabguru-theme-mode']) {
+        setTheme(changes['tabguru-theme-mode'].newValue === 'dark' ? 'dark' : 'white');
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, []);
+  return theme;
+}
+
+const T = {
+  dark: {
+    bg: 'bg-[#0f172a]/70 bg-gradient-to-br from-slate-900/80 to-slate-800/80 border border-white/10 text-white',
+    dragShadow: 'shadow-[0_12px_48px_rgba(0,0,0,0.75)]',
+    idleShadow: 'shadow-[0_8px_40px_rgba(0,0,0,0.6)]',
+    minDrag: 'shadow-[0_8px_32px_rgba(0,0,0,0.7)]',
+    textMain: 'text-white',
+    textMuted: 'text-slate-400',
+    breadcrumbBg: 'bg-white/5 border border-white/[0.06]',
+    breadcrumbBtn: 'hover:bg-white/10 text-slate-500 hover:text-slate-300',
+    breadcrumbClose: 'hover:bg-red-500/20 text-slate-500 hover:text-red-400 border-white/[0.06]',
+    iconBtn: 'text-slate-400 hover:text-slate-200 hover:bg-white/10',
+    input: 'text-white border-violet-500/60 placeholder-slate-500',
+    timerNum: 'text-slate-300',
+    btnExtend: 'bg-white/5 border border-white/10 text-slate-500 hover:border-violet-500/40 hover:text-slate-300 hover:bg-violet-500/10',
+    btnComplete: 'bg-white/5 border border-emerald-400/20 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-400/40 hover:text-emerald-300 shadow-[0_2px_12px_rgba(16,185,129,0.1)] hover:shadow-[0_2px_20px_rgba(16,185,129,0.2)]',
+    divider: 'border-white/[0.06]',
+    childCard: 'bg-white/5 border border-white/[0.03]',
+    childText: 'text-slate-300',
+    childHeader: 'text-slate-500',
+    childBtnGo: 'bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 border border-violet-500/20',
+    childBtnDone: 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/20',
+  },
+  white: {
+    bg: 'bg-white/40 bg-gradient-to-br from-white/60 to-white/30 border border-white/60 text-slate-800',
+    dragShadow: 'shadow-[0_12px_48px_rgba(139,92,246,0.3)]',
+    idleShadow: 'shadow-[0_8px_40px_rgba(139,92,246,0.15)]',
+    minDrag: 'shadow-[0_8px_32px_rgba(139,92,246,0.25)]',
+    textMain: 'text-slate-800',
+    textMuted: 'text-slate-500',
+    breadcrumbBg: 'bg-white/50 border border-white/60',
+    breadcrumbBtn: 'hover:bg-white/70 text-slate-600 hover:text-slate-800',
+    breadcrumbClose: 'hover:bg-red-50/80 text-slate-400 hover:text-red-500 border-white/60',
+    iconBtn: 'text-slate-500 hover:text-slate-700 hover:bg-white/60',
+    input: 'text-slate-800 border-violet-400/60 placeholder-slate-400',
+    timerNum: 'text-slate-700',
+    btnExtend: 'bg-white/50 border border-white/60 text-slate-600 hover:border-violet-400/60 hover:text-slate-800 hover:bg-white/80',
+    btnComplete: 'bg-white/60 border border-emerald-500/30 text-emerald-700 hover:bg-white/80 hover:border-emerald-500/50 hover:text-emerald-800 shadow-[0_2px_12px_rgba(16,185,129,0.15)] hover:shadow-[0_2px_20px_rgba(16,185,129,0.25)]',
+    divider: 'border-black/[0.06]',
+    childCard: 'bg-white/50 border border-white/60',
+    childText: 'text-slate-700',
+    childHeader: 'text-slate-500',
+    childBtnGo: 'bg-violet-600/10 hover:bg-violet-600/20 text-violet-700 border border-violet-600/20',
+    childBtnDone: 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 border border-emerald-600/20',
+  }
+};
+
 // ─── Helper: send message to background ──────────────────────────────────────
 
 function sendMsg(msg: ExtensionMessage): Promise<ExtensionResponse> {
@@ -141,6 +207,9 @@ interface Props {
 }
 
 export default function Banner({ purpose: initialPurpose, tabId, activeChildren = [], onRefresh, parentPurposeText }: Props) {
+  const theme = useBannerTheme();
+  const t = T[theme];
+  
   const [purpose, setPurpose] = useState<TabPurpose | null>(initialPurpose);
   const [minimized, setMinimized] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -404,11 +473,11 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
         className={`
           fixed z-[2147483647]
           flex items-center justify-center w-10 h-10 rounded-full
-          bg-[#0f172a]/95 border border-white/10 backdrop-blur-md
+          ${t.bg} backdrop-blur-md
           shadow-[0_4px_20px_rgba(0,0,0,0.5)]
           hover:scale-110 transition-all duration-200
           text-lg select-none
-          ${isDragging ? 'shadow-[0_8px_32px_rgba(0,0,0,0.7)] scale-110' : ''}
+          ${isDragging ? t.minDrag + ' scale-110' : ''}
         `}
         style={{
           fontFamily: 'system-ui',
@@ -437,12 +506,12 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
       onAnimationEnd={() => setAnimationDone(true)}
       className={`
         fixed z-[2147483647] select-none
-        rounded-2xl border border-white/10
-        bg-[#0f172a]/95 backdrop-blur-xl
+        rounded-2xl
+        ${t.bg} backdrop-blur-xl
         p-3 min-w-[260px] max-w-[300px]
         font-inter transition-shadow duration-150
         ${animationDone ? '' : 'banner-enter'}
-        ${isDragging ? 'shadow-[0_12px_48px_rgba(0,0,0,0.75)]' : 'shadow-[0_8px_40px_rgba(0,0,0,0.6)]'}
+        ${isDragging ? t.dragShadow : t.idleShadow}
         ${isExpired && !isDragging ? 'animate-border-glow' : ''}
       `}
       style={{
@@ -464,14 +533,14 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
       {/* Parent breadcrumb — only on child tabs */}
       {purpose?.openerTabId && (
         <div className="flex items-center gap-2 mb-2.5">
-          <div className="flex-1 flex items-stretch rounded-lg bg-white/5 border border-white/[0.06] overflow-hidden min-w-0">
+          <div className={`flex-1 flex items-stretch rounded-lg overflow-hidden min-w-0 ${t.breadcrumbBg}`}>
             <button
               onClick={handleGoToParent}
-              className="
+              className={`
                 flex-1 flex items-center gap-1.5 px-2 py-1.5
-                hover:bg-white/10
-                text-slate-500 hover:text-slate-300 transition-colors text-left cursor-pointer min-w-0
-              "
+                transition-colors text-left cursor-pointer min-w-0
+                ${t.breadcrumbBtn}
+              `}
             >
               <span className="text-[11px] leading-none shrink-0">←</span>
               <span className="text-[9px] font-bold uppercase tracking-widest truncate">
@@ -481,10 +550,11 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
             <button
               onClick={handleDetachFromParent}
               title="Detach from parent"
-              className="
+              className={`
                 shrink-0 flex items-center justify-center w-7
-                hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors cursor-pointer border-l border-white/[0.06]
-              "
+                transition-colors cursor-pointer border-l
+                ${t.breadcrumbClose}
+              `}
             >
               <span className="text-[10px] leading-none">✕</span>
             </button>
@@ -492,10 +562,10 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
           {/* Minimize button (Next to breadcrumb) */}
           <button
             onClick={() => setMinimized(true)}
-            className="
+            className={`
               shrink-0 flex items-center justify-center w-7 h-7 rounded-lg
-              text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors cursor-pointer
-            "
+              transition-colors cursor-pointer ${t.iconBtn}
+            `}
             title="Minimize"
           >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
@@ -524,16 +594,15 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
                 e.stopPropagation();
               }}
               onBlur={handleSavePurpose}
-              className="
-                w-full text-[15px] font-bold text-white leading-snug
-                bg-transparent border-b border-violet-500/60 outline-none
-                pb-0.5 placeholder-slate-500
-              "
+              className={`
+                w-full text-[15px] font-bold leading-snug
+                bg-transparent border-b outline-none pb-0.5 ${t.input}
+              `}
               placeholder="Rename task…"
             />
           ) : (
             <p
-              className="text-[15px] font-bold text-white leading-snug truncate cursor-text group"
+              className={`text-[15px] font-bold leading-snug truncate cursor-text group ${t.textMain}`}
               title={`${purpose ? purpose.purpose : 'Browsing Context'} — click to rename`}
               onClick={() => {
                 if (purpose) {
@@ -543,17 +612,17 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
               }}
             >
               {purpose ? purpose.purpose : 'Browsing Context'}
-              <span className="ml-1 opacity-0 group-hover:opacity-40 text-[9px] text-slate-400 transition-opacity">✎</span>
+              <span className={`ml-1 opacity-0 group-hover:opacity-40 text-[9px] transition-opacity ${t.textMuted}`}>✎</span>
             </p>
           )}
         </div>
         {!purpose?.openerTabId && (
           <button
             onClick={() => setMinimized(true)}
-            className="
+            className={`
               shrink-0 flex items-center justify-center w-6 h-6 rounded-lg mt-0.5
-              text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-colors cursor-pointer
-            "
+              transition-colors cursor-pointer ${t.iconBtn}
+            `}
             title="Minimize"
           >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
@@ -570,46 +639,40 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
             <div className="flex items-center gap-1.5">
               <span
                 className={`text-sm font-mono font-bold tabular-nums ${
-                  isExpired ? 'text-red-400' : isUrgent ? 'timer-urgent' : 'text-slate-300'
+                  isExpired ? 'text-red-500' : isUrgent ? 'timer-urgent' : t.timerNum
                 }`}
               >
                 {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
               </span>
               {isExpired && (
-                <span className="text-[10px] text-red-400 font-semibold">Time's up!</span>
+                <span className="text-[10px] text-red-500 font-semibold">Time's up!</span>
               )}
             </div>
 
             {/* Extend button */}
             <button
               onClick={() => handleExtend(5)}
-              className="
-                text-[10px] font-semibold px-2 py-0.5 rounded-md
-                bg-white/5 border border-white/10 text-slate-500
-                hover:border-violet-500/40 hover:text-slate-300 hover:bg-violet-500/10
-                transition-all duration-150
-              "
+              className={`
+                text-[10px] font-semibold px-2 py-0.5 rounded-md transition-all duration-150
+                ${t.btnExtend}
+              `}
             >
               +5m
             </button>
           </div>
 
           {/* Divider */}
-          <div className="my-2 border-t border-white/[0.06]" />
+          <div className={`my-2 border-t ${t.divider}`} />
 
           {/* Complete button */}
           <button
             onClick={handleComplete}
-            className="
+            className={`
               w-full py-1.5 rounded-lg text-xs font-semibold
-              bg-gradient-to-r from-emerald-500/80 to-teal-600/80
-              hover:from-emerald-400/90 hover:to-teal-500/90
-              text-white border border-emerald-400/20
-              shadow-[0_2px_12px_rgba(16,185,129,0.25)]
-              hover:shadow-[0_2px_20px_rgba(16,185,129,0.4)]
               transform hover:scale-[1.02] active:scale-[0.99]
               transition-all duration-150
-            "
+              ${t.btnComplete}
+            `}
           >
             ✅ Mark Complete
           </button>
@@ -619,19 +682,19 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
       {/* Child tab section */}
       {activeChildren.length > 0 && (
         <>
-          <div className="my-2 border-t border-white/[0.06]" />
+          <div className={`my-2 border-t ${t.divider}`} />
           <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none px-1 mb-2">
+            <p className={`text-[10px] font-bold uppercase tracking-widest leading-none px-1 mb-2 ${t.childHeader}`}>
               Pending sub tasks
             </p>
             {[...activeChildren]
               .sort((a, b) => b.startTime - a.startTime)
               .map((child) => (
-                <div key={child.tabId} className="bg-white/5 rounded-xl p-2.5 space-y-2 border border-white/[0.03]">
+                <div key={child.tabId} className={`rounded-xl p-2.5 space-y-2 ${t.childCard}`}>
                   <div className="flex items-center gap-2 min-w-0 pointer-events-none">
                     <span className="text-sm shrink-0">🌿</span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-slate-300 truncate leading-tight" title={child.purpose}>
+                      <p className={`text-xs font-semibold truncate leading-tight ${t.childText}`} title={child.purpose}>
                         "{child.purpose}"
                       </p>
                     </div>
@@ -639,22 +702,21 @@ export default function Banner({ purpose: initialPurpose, tabId, activeChildren 
                   <div className="flex gap-1.5 justify-end">
                     <button
                       onClick={() => handleGoToTab(child.tabId)}
-                      className="
+                      className={`
                         text-[9px] font-bold px-2 py-1 rounded-md
-                        bg-violet-600/20 hover:bg-violet-600/30 text-violet-400
-                        border border-violet-500/20 transition-colors cursor-pointer
-                        flex items-center gap-1
-                      "
+                        transition-colors cursor-pointer flex items-center gap-1
+                        ${t.childBtnGo}
+                      `}
                     >
                       Go to Tab <span className="text-[10px]">→</span>
                     </button>
                     <button
                       onClick={() => handleMarkChildComplete(child.tabId)}
-                      className="
+                      className={`
                         text-[9px] font-bold px-2 py-1 rounded-md
-                        bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400
-                        border border-emerald-500/20 transition-colors cursor-pointer
-                      "
+                        transition-colors cursor-pointer
+                        ${t.childBtnDone}
+                      `}
                     >
                       Done
                     </button>

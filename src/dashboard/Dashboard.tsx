@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from '../newtab/ThemeContext';
 import type { HistoricalPurpose } from '../types';
 
 // ─── Types mirroring indexedDb.ts ────────────────────────────────────────────
@@ -205,7 +206,7 @@ function WeeklyChart({ days }: { days: WeeklyDay[] }) {
                 {day.label}
               </text>
               {isToday && (
-                <circle cx={cx} cy={H + 26} r={2} fill="#a78bfa" />
+                <circle cx={cx} cy={H + 26} r={2} fill="var(--violet-light)" />
               )}
             </g>
           );
@@ -213,12 +214,12 @@ function WeeklyChart({ days }: { days: WeeklyDay[] }) {
 
         <defs>
           <linearGradient id="focusGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7c3aed" />
-            <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.7" />
+            <stop offset="0%" stopColor="var(--violet)" />
+            <stop offset="100%" stopColor="var(--indigo)" stopOpacity="0.7" />
           </linearGradient>
           <linearGradient id="driftGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#f43f5e" />
-            <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.4" />
+            <stop offset="0%" stopColor="var(--rose)" />
+            <stop offset="100%" stopColor="var(--rose)" stopOpacity="0.4" />
           </linearGradient>
         </defs>
       </svg>
@@ -227,11 +228,11 @@ function WeeklyChart({ days }: { days: WeeklyDay[] }) {
       <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 10, height: 10, borderRadius: 2, background: '#7c3aed' }} />
-          <span style={{ fontSize: 11, color: '#64748b' }}>Focus time</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Focus time</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 10, height: 10, borderRadius: 2, background: '#f43f5e' }} />
-          <span style={{ fontSize: 11, color: '#64748b' }}>Drift events</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Drift events</span>
         </div>
       </div>
 
@@ -242,12 +243,12 @@ function WeeklyChart({ days }: { days: WeeklyDay[] }) {
             position: 'fixed',
             left: tooltip.x + 12,
             top: tooltip.y - 32,
-            background: '#0d111e',
+            background: 'var(--bg)',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 8,
             padding: '6px 12px',
             fontSize: 12,
-            color: '#e2e8f0',
+            color: 'var(--text)',
             pointerEvents: 'none',
             zIndex: 100,
             whiteSpace: 'nowrap',
@@ -291,7 +292,7 @@ function CompletionDonut({ rate }: { rate: number }) {
       <text x={CX} y={CY - 6} textAnchor="middle" fontSize="22" fontWeight="800" fontFamily="Outfit, sans-serif" fill={color}>
         {rate}%
       </text>
-      <text x={CX} y={CY + 12} textAnchor="middle" fontSize="10" fontFamily="Inter, sans-serif" fill="#64748b">
+      <text x={CX} y={CY + 12} textAnchor="middle" fontSize="10" fontFamily="Inter, sans-serif" fill="var(--text-muted)">
         complete
       </text>
     </svg>
@@ -329,10 +330,10 @@ function DailyReflectionModal({
           <div style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 36 }}>{showConfetti ? '🎉' : '🧙'}</span>
           </div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 26, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>
+          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 26, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
             Daily Reflection
           </h2>
-          <p style={{ fontSize: 12, color: '#64748b', marginBottom: 28 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 28 }}>
             {fmtDate(date)}
           </p>
 
@@ -365,7 +366,7 @@ function DailyReflectionModal({
           </div>
 
           {/* Star rating */}
-          <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
             How focused did you feel today?
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 28 }}>
@@ -414,19 +415,19 @@ function DailyReflectionModal({
 function StatTile({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
       borderRadius: 14,
       padding: '14px 12px',
       textAlign: 'center',
     }}>
-      <p style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+      <p style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
         {label}
       </p>
       <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>
         {value}
       </p>
-      <p style={{ fontSize: 10, color: '#475569', marginTop: 4 }}>{sub}</p>
+      <p style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{sub}</p>
     </div>
   );
 }
@@ -461,10 +462,10 @@ function HistoryLog({ history }: { history: HistoryEntry[] }) {
             flex: 1,
             minWidth: 200,
             padding: '8px 14px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
-            color: '#e2e8f0',
+            color: 'var(--text)',
             fontSize: 13,
             outline: 'none',
             fontFamily: 'Inter, sans-serif',
@@ -475,10 +476,10 @@ function HistoryLog({ history }: { history: HistoryEntry[] }) {
           onChange={(e) => setFilterStatus(e.target.value as any)}
           style={{
             padding: '8px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
-            color: '#94a3b8',
+            color: 'var(--text-muted)',
             fontSize: 12,
             cursor: 'pointer',
           }}
@@ -492,10 +493,10 @@ function HistoryLog({ history }: { history: HistoryEntry[] }) {
           onChange={(e) => setFilterCat(e.target.value)}
           style={{
             padding: '8px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
-            color: '#94a3b8',
+            color: 'var(--text-muted)',
             fontSize: 12,
             cursor: 'pointer',
           }}
@@ -510,7 +511,7 @@ function HistoryLog({ history }: { history: HistoryEntry[] }) {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#475569' }}>
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-dim)' }}>
           <p style={{ fontSize: 24, marginBottom: 8 }}>🗂️</p>
           <p style={{ fontSize: 13 }}>No history yet — complete some sessions to see them here.</p>
         </div>
@@ -532,9 +533,9 @@ function HistoryLog({ history }: { history: HistoryEntry[] }) {
                 <tr key={h.id}>
                   <td className="purpose-cell">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ color: '#e2e8f0', fontWeight: 500 }}>{h.purpose}</span>
+                      <span style={{ color: 'var(--text)', fontWeight: 500 }}>{h.purpose}</span>
                       {h.domain && (
-                        <span style={{ fontSize: 10, color: '#475569' }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                           {h.domain}
                         </span>
                       )}
@@ -542,7 +543,7 @@ function HistoryLog({ history }: { history: HistoryEntry[] }) {
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(h.date)}</td>
                   <td>{catBadge(h.category)}</td>
-                  <td style={{ fontFamily: 'Outfit, sans-serif', color: '#a78bfa' }}>
+                  <td style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--violet-light)' }}>
                     {fmtMs(h.timeSpentMs)}
                   </td>
                   <td>{h.durationMinutesAllocated}m</td>
@@ -572,7 +573,7 @@ function DriftHotspots({ hotspots }: { hotspots: DriftHotspot[] }) {
 
   if (hotspots.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '32px 0', color: '#475569' }}>
+      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-dim)' }}>
         <p style={{ fontSize: 28, marginBottom: 8 }}>🎯</p>
         <p style={{ fontSize: 13 }}>No drift events recorded yet.</p>
       </div>
@@ -583,15 +584,15 @@ function DriftHotspots({ hotspots }: { hotspots: DriftHotspot[] }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {hotspots.map(({ domain, count }, i) => (
         <div key={domain} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 11, color: '#475569', width: 16, textAlign: 'right' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 16, textAlign: 'right' }}>
             {i + 1}
           </span>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500 }}>{domain}</span>
-              <span style={{ fontSize: 12, color: '#f43f5e', fontWeight: 700 }}>{count}×</span>
+              <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{domain}</span>
+              <span style={{ fontSize: 12, color: 'var(--rose)', fontWeight: 700 }}>{count}×</span>
             </div>
-            <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
               <div
                 style={{
                   height: '100%',
@@ -616,7 +617,7 @@ function MiniCard({ icon, label, value, color }: { icon: string; label: string; 
     <div className="glass-card card-enter" style={{ padding: '20px 22px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <span style={{ fontSize: 20 }}>{icon}</span>
-        <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
           {label}
         </span>
       </div>
@@ -630,6 +631,7 @@ function MiniCard({ icon, label, value, color }: { icon: string; label: string; 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { mode } = useTheme();
   const [todayStats, setTodayStats] = useState<DailyStats | null>(null);
   const [weeklyDays, setWeeklyDays] = useState<WeeklyDay[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -639,6 +641,14 @@ export default function Dashboard() {
   const [reflectionDate, setReflectionDate] = useState(todayStr());
   const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
   const hasCheckedReflection = useRef(false);
+
+  useEffect(() => {
+    if (mode === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [mode]);
 
   const loadData = useCallback(async () => {
     try {
@@ -728,10 +738,10 @@ export default function Dashboard() {
               style={{ width: 44, height: 44, borderRadius: 12, boxShadow: '0 0 24px rgba(124,58,237,0.4)' }}
             />
             <div>
-              <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 28, fontWeight: 800, color: '#e2e8f0', lineHeight: 1 }}>
+              <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 28, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
                 Tab<span style={{ background: 'linear-gradient(135deg,#a78bfa,#60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Guru</span>
               </h1>
-              <p style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>Productivity Dashboard</p>
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Productivity Dashboard</p>
             </div>
           </div>
 
@@ -740,7 +750,7 @@ export default function Dashboard() {
               onClick={() => { setReflectionDate(today); setShowReflection(true); }}
               style={{
                 padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(124,58,237,0.3)',
-                background: 'rgba(124,58,237,0.1)', color: '#a78bfa', fontSize: 13, fontWeight: 600,
+                background: 'rgba(124,58,237,0.1)', color: 'var(--violet-light)', fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'Inter, sans-serif',
               }}
             >
@@ -749,8 +759,8 @@ export default function Dashboard() {
             <button
               onClick={loadData}
               style={{
-                padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(255,255,255,0.04)', color: '#64748b', fontSize: 13,
+                padding: '9px 14px', borderRadius: 10, border: '1px solid var(--border)',
+                background: 'var(--surface)', color: 'var(--text-muted)', fontSize: 13,
                 cursor: 'pointer',
               }}
               title="Refresh"
@@ -767,13 +777,13 @@ export default function Dashboard() {
               borderTop: '3px solid #7c3aed', borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
             }} />
-            <p style={{ color: '#475569', fontSize: 13 }}>Loading your analytics…</p>
+            <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading your analytics…</p>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : (
           <>
             {/* Tab Navigation */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 12, width: 'fit-content' }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'var(--surface)', padding: 4, borderRadius: 12, width: 'fit-content' }}>
               {(['overview', 'history'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -834,16 +844,16 @@ export default function Dashboard() {
                   <div className="glass-card card-enter" style={{ padding: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                       <div>
-                        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: '#e2e8f0' }}>
+                        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
                           Weekly Progress
                         </h2>
-                        <p style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Last 7 days</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Last 7 days</p>
                       </div>
                     </div>
                     {weeklyDays.length > 0 ? (
                       <WeeklyChart days={weeklyDays} />
                     ) : (
-                      <div style={{ textAlign: 'center', padding: '32px 0', color: '#475569', fontSize: 13 }}>
+                      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-dim)', fontSize: 13 }}>
                         No data yet — complete a few sessions!
                       </div>
                     )}
@@ -851,10 +861,10 @@ export default function Dashboard() {
 
                   {/* Card 2: Completion Rate */}
                   <div className="glass-card card-enter" style={{ padding: 24 }}>
-                    <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>
+                    <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
                       Goal Completion Rate
                     </h2>
-                    <p style={{ fontSize: 11, color: '#475569', marginBottom: 20 }}>Today's session</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 20 }}>Today's session</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
                       <CompletionDonut rate={todayStats?.completionRate ?? 0} />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
@@ -870,7 +880,7 @@ export default function Dashboard() {
                         display: 'flex', alignItems: 'center', gap: 8,
                       }}>
                         <span>🎉</span>
-                        <span style={{ fontSize: 12, color: '#34d399', fontWeight: 600 }}>
+                        <span style={{ fontSize: 12, color: 'var(--emerald)', fontWeight: 600 }}>
                           Outstanding! Keep it up!
                         </span>
                       </div>
@@ -880,10 +890,10 @@ export default function Dashboard() {
                   {/* Card 3: Drift Hotspots */}
                   <div className="glass-card card-enter" style={{ padding: 24 }}>
                     <div style={{ marginBottom: 20 }}>
-                      <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: '#e2e8f0' }}>
+                      <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
                         Drift Hotspots
                       </h2>
-                      <p style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Domains that trigger the most alerts (last 7 days)</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Domains that trigger the most alerts (last 7 days)</p>
                     </div>
                     <DriftHotspots hotspots={hotspots} />
                   </div>
@@ -892,15 +902,15 @@ export default function Dashboard() {
                   <div className="glass-card card-enter" style={{ padding: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                       <div>
-                        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: '#e2e8f0' }}>
+                        <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>
                           Recent Sessions
                         </h2>
-                        <p style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Latest completed purposes</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Latest completed purposes</p>
                       </div>
                       <button
                         onClick={() => setActiveTab('history')}
                         style={{
-                          fontSize: 11, color: '#7c3aed', background: 'none', border: 'none',
+                          fontSize: 11, color: 'var(--violet)', background: 'none', border: 'none',
                           cursor: 'pointer', fontWeight: 600, padding: 0,
                         }}
                       >
@@ -908,7 +918,7 @@ export default function Dashboard() {
                       </button>
                     </div>
                     {history.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '24px 0', color: '#475569', fontSize: 13 }}>
+                      <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-dim)', fontSize: 13 }}>
                         No sessions recorded yet.
                       </div>
                     ) : (
@@ -924,10 +934,10 @@ export default function Dashboard() {
                               {h.status === 'completed' ? '✅' : '❌'}
                             </span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 12, color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <p style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {h.purpose}
                               </p>
-                              <p style={{ fontSize: 10, color: '#475569' }}>
+                              <p style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                                 {fmtMs(h.timeSpentMs)} · {fmtDate(h.date)}
                               </p>
                             </div>
@@ -944,10 +954,10 @@ export default function Dashboard() {
             {activeTab === 'history' && (
               <div className="glass-card card-enter" style={{ padding: 28 }}>
                 <div style={{ marginBottom: 20 }}>
-                  <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>
+                  <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
                     Session History
                   </h2>
-                  <p style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
                     {history.length} sessions recorded
                   </p>
                 </div>
@@ -964,7 +974,7 @@ export default function Dashboard() {
 function RateStat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: 12, color: '#64748b' }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</span>
       <span style={{ fontSize: 16, fontFamily: 'Outfit, sans-serif', fontWeight: 700, color }}>
         {value}
       </span>

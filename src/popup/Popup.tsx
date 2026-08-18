@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { TabPurpose } from '../types';
+import { useTheme } from '../newtab/ThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ function TabRow({
         <p style={{
           fontSize: 12,
           fontWeight: 600,
-          color: '#e2e8f0',
+          color: 'var(--text)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
@@ -123,7 +124,7 @@ function TabRow({
         {purpose.destinationUrl && (
           <p style={{
             fontSize: 10,
-            color: '#475569',
+            color: 'var(--violet)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -155,9 +156,18 @@ function TabRow({
 // ─── Main Popup ───────────────────────────────────────────────────────────────
 
 export default function Popup() {
+  const { mode, setMode } = useTheme();
   const [activeTabs, setActiveTabs] = useState<ActiveTab[]>([]);
   const [todayStats, setTodayStats] = useState<DailyStats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (mode === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [mode]);
 
   const loadData = useCallback(async () => {
     try {
@@ -252,15 +262,15 @@ export default function Popup() {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '16px 16px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        borderBottom: '1px solid var(--border-subtle)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 9,
-            background: 'linear-gradient(135deg,rgba(124,58,237,0.3),rgba(79,70,229,0.3))',
-            border: '1px solid rgba(124,58,237,0.3)',
+            background: 'var(--border-subtle)',
+            border: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(124,58,237,0.2)',
+            boxShadow: '0 2px 12px var(--border-subtle)',
           }}>
             <img
               src={chrome.runtime.getURL('icons/icon128.png')}
@@ -269,68 +279,85 @@ export default function Popup() {
             />
           </div>
           <div>
-            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 16, fontWeight: 800, color: '#e2e8f0', lineHeight: 1 }}>
+            <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: 16, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
               Tab<span style={{ background: 'linear-gradient(90deg,#a78bfa,#60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Guru</span>
             </h1>
-            <p style={{ fontSize: 9, color: '#334155', marginTop: 1 }}>Browse with intention</p>
+            <p style={{ fontSize: 9, color: 'var(--violet-light)', marginTop: 1 }}>Browse with intention</p>
           </div>
         </div>
 
-        <button
-          onClick={handleOpenDashboard}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '6px 11px', borderRadius: 8,
-            background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)',
-            color: '#a78bfa', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'Inter, sans-serif',
-            transition: 'all 0.12s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(124,58,237,0.2)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
-        >
-          📊 Stats
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => setMode(mode === 'dark' ? 'white' : 'dark')}
+            title="Toggle theme"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 28, height: 28, borderRadius: 8,
+              background: 'transparent', border: 'none',
+              color: 'var(--text-muted)', cursor: 'pointer',
+              transition: 'all 0.12s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            {mode === 'dark' ? '☀' : '🌙'}
+          </button>
+          <button
+            onClick={handleOpenDashboard}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '6px 11px', borderRadius: 8,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--violet)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'Inter, sans-serif',
+              transition: 'all 0.12s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--surface)')}
+          >
+            📊 Stats
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexDirection: 'column' }}>
           <div style={{
             width: 24, height: 24,
-            border: '2px solid rgba(124,58,237,0.2)',
-            borderTop: '2px solid #7c3aed',
+            border: '2px solid var(--border-subtle)',
+            borderTop: '2px solid var(--violet)',
             borderRadius: '50%',
             animation: 'spin 0.7s linear infinite',
           }} />
-          <p style={{ fontSize: 11, color: '#334155' }}>Loading…</p>
+          <p style={{ fontSize: 11, color: 'var(--violet-light)' }}>Loading…</p>
         </div>
       ) : (
         <div className="fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
           {/* ── Today's Stats ── */}
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
             <p className="section-label" style={{ marginBottom: 8 }}>Today</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <div className="stat-pill">
-                <span className="value" style={{ color: '#a78bfa' }}>
+                <span className="value" style={{ color: 'var(--violet-light)' }}>
                   {todayStats ? `${todayStats.completedPurposes}/${todayStats.totalPurposes}` : '—'}
                 </span>
                 <span className="label">Goals</span>
               </div>
               <div className="stat-pill">
-                <span className="value" style={{ color: '#22d3ee' }}>
+                <span className="value" style={{ color: 'var(--cyan)' }}>
                   {todayStats ? fmtMs(todayStats.totalFocusMs) : '—'}
                 </span>
                 <span className="label">Focus</span>
               </div>
               <div className="stat-pill">
-                <span className="value" style={{ color: todayStats?.driftCount === 0 ? '#34d399' : '#fb7185' }}>
+                <span className="value" style={{ color: todayStats?.driftCount === 0 ? 'var(--emerald)' : 'var(--rose)' }}>
                   {todayStats ? todayStats.driftCount : '—'}
                 </span>
                 <span className="label">Drifts</span>
               </div>
               <div className="stat-pill">
-                <span className="value" style={{ color: '#fbbf24' }}>
+                <span className="value" style={{ color: 'var(--amber)' }}>
                   {todayStats ? `${todayStats.completionRate}%` : '—'}
                 </span>
                 <span className="label">Rate</span>
@@ -341,11 +368,11 @@ export default function Popup() {
           {/* ── Active Tabs ── */}
           <div style={{ flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p className="section-label">
+              <p className="section-label" style={{ color: 'var(--text-dim)' }}>
                 Active Sessions
               </p>
               {activeTabs.length > 0 && (
-                <span style={{ fontSize: 10, color: '#475569' }}>
+                <span style={{ fontSize: 10, color: 'var(--violet-light)' }}>
                   {activeCount > 0 && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block', animation: 'pulse-dot 2s ease-in-out infinite' }} />
@@ -362,10 +389,10 @@ export default function Popup() {
               <div style={{
                 flex: 1, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '24px 0', color: '#334155',
+                padding: '24px 0', color: 'var(--violet-light)',
               }}>
                 <span style={{ fontSize: 28 }}>🌿</span>
-                <p style={{ fontSize: 12, color: '#475569', textAlign: 'center' }}>
+                <p style={{ fontSize: 12, color: 'var(--violet)', textAlign: 'center' }}>
                   No active sessions.<br/>Open a new tab to start one.
                 </p>
               </div>
@@ -386,7 +413,7 @@ export default function Popup() {
           {/* ── Quick Actions ── */}
           <div style={{
             padding: '12px 14px 16px',
-            borderTop: '1px solid rgba(255,255,255,0.04)',
+            borderTop: '1px solid var(--border-subtle)',
             display: 'flex',
             flexDirection: 'column',
             gap: 8,
