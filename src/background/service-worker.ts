@@ -214,12 +214,20 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   const url = changeInfo.url;
 
+  // Trial Check specifically for the New Tab Page
+  if (url.startsWith(PURPOSE_PAGE)) {
+    const hasAccess = await isPremiumOrTrialActive();
+    if (!hasAccess) {
+      chrome.tabs.update(tabId, { url: PAYWALL_URL });
+    }
+    return;
+  }
+
   // Skip blank pages, extension pages, and internal browser pages
   if (
     !url ||
     url === 'chrome://newtab/' ||
     url === 'edge://newtab/' ||
-    url.startsWith(PURPOSE_PAGE) ||
     SKIP_PATTERNS.some((p) => p.test(url))
   ) {
     return;
